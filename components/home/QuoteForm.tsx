@@ -23,9 +23,9 @@ export default function QuoteForm({ locale }: { locale: Locale }) {
   return (
     <section className="section section--subtle" id="angebot">
       <Container>
-        <div style={{ maxWidth: 640 }}>
-          <SectionHeader eyebrow={c.eyebrow} title={c.title} lede={c.lede} />
-          <div style={{ background:'#fff', border:'1px solid var(--border)', borderRadius:'var(--r-card)', padding:'var(--s-6)' }}>
+        <div className="quote2">
+          <div><SectionHeader eyebrow={c.eyebrow} title={c.title} lede={c.lede} /></div>
+          <div className="quote2__form">
             <div className="field"><label htmlFor="q-co">{c.company}</label><input id="q-co" className="input" /></div>
             <div className="grid grid-2">
               <div className="field"><label htmlFor="q-em">{c.email}</label><input id="q-em" type="email" className="input" /></div>

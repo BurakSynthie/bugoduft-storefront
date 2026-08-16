@@ -1,20 +1,42 @@
 'use client';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import { beginCheckout, finalizeCheckout } from '@/app/actions/checkout';
+import { useRouter } from 'next/navigation';
 import type { Locale } from '@/i18n/config';
 import { formatMoney, formatQty } from '@/lib/money';
 import { validateQuantity, quantityMessage } from '@/lib/quantity';
 import { totalCents } from '@/lib/configurator/pricing';
 import type { ArtworkRef, BugoConfiguration, Intensity, ShapeId } from '@/lib/configurator/types';
+import { firstConfigError, type ConfigError } from '@/lib/configurator/pricing';
 import { SHAPES, isDeferred, shapeGeometry } from '@/lib/configurator/shapes';
 import Upload from './Upload';
+import { useStorefront } from '@/lib/cart/store';
+import { persistItemFiles } from '@/lib/cart/checkout-client';
+import type { CartItem } from '@/lib/cart/types';
+import { sf, WA } from '@/lib/i18n/storefront';
+import { business } from '@/config/site';
+import {
+  loadDraft, saveDraft, clearDraft, isMeaningful, getLive, setLive, newConfigId,
+  metaOf, refFromMeta, setFrontFile, setBackFile, setSupportingFiles, hasSessionFiles, type CfgDraft,
+} from '@/lib/configurator/draft';
 
 export type CfgCollection = { collectionCode:string; collectionName:string; productId:string; basePriceCents:number; scentCodes:string[] };
 export type CfgScent = { code:string; category:string; name:string; description:string };
 
 const QUICK = [1000,2000,5000,10000,25000,50000,100000];
 const CATS = ['frisch','fruchtig','suess','elegant','intensiv'] as const;
+
+// Localized shape labels for the cart summary (the configurator tiles keep their
+// existing labels; this only prevents German leakage in the new cart UI).
+const SHAPE_L: Record<ShapeId, Record<Locale,string>> = {
+  rectangle:{de:'Rechteck',en:'Rectangle',fr:'Rectangle'},
+  square:{de:'Quadrat',en:'Square',fr:'Carré'},
+  round:{de:'Rund',en:'Round',fr:'Rond'},
+  oval:{de:'Oval',en:'Oval',fr:'Ovale'},
+  shield:{de:'Wappen',en:'Shield',fr:'Blason'},
+  heart:{de:'Herz',en:'Heart',fr:'Cœur'},
+  bugo_decides:{de:'Form von BUGO bestimmen lassen',en:'Let BUGO choose the shape',fr:'Laisser BUGO choisir la forme'},
+  custom_contour:{de:'Individuelle Kontur',en:'Custom contour',fr:'Contour personnalisé'},
+};
 
 const L = {
   de:{ collection:'Kollektion', qty:'Menge', qtyOther:'Andere Menge', scent:'Duft', intensity:'Duftintensität',
@@ -27,10 +49,10 @@ const L = {
     identicalShort:'identisch', ready:'Bereit zur Prüfung', incomplete:'Unvollständig',
     previewNote:'Die Vorschau dient zur Orientierung. Die finale Druckdatei wird von unserem Designteam geprüft.',
     deferredNote:'Die finale Produktionsform wird von unserem Designteam anhand Ihrer Datei vorbereitet.',
-    yourLogo:'Ihr Logo', step:'Schritt', of:'von', chooseScent:'Duft auswählen', all:'Alle',
+    yourLogo:'Ihr Logo', step:'Schritt', of:'von', chooseScent:'Bitte wählen Sie einen Duft.', all:'Alle',
     surchargeHint:'einmalig +30,00 € pro Konfiguration', done:'Konfiguration bereit',
     doneNote:'Ihre Konfiguration ist vollständig und für den nächsten Schritt vorbereitet.', edit:'Bearbeiten',
-    cord:'Kordel: Schwarz (fest)', checkout:'Zur Kasse', loading:'Wird vorbereitet…', checkoutErr:'Die Konfiguration konnte nicht für den Checkout vorbereitet werden. Bitte versuchen Sie es erneut.' },
+    cord:'Kordel: Schwarz (fest)' },
   en:{ collection:'Collection', qty:'Quantity', qtyOther:'Other quantity', scent:'Scent', intensity:'Fragrance intensity',
     normal:'Normal', intense:'Intensive', shape:'Shape', front:'Front', back:'Back',
     identical:'Front and back identical', review:'Review', designTeam:'Notes for our design team',
@@ -41,10 +63,10 @@ const L = {
     identicalShort:'identical', ready:'Ready for review', incomplete:'Incomplete',
     previewNote:'The preview is for orientation only. The final print file is checked by our design team.',
     deferredNote:'The final production shape is prepared by our design team from your file.',
-    yourLogo:'Your logo', step:'Step', of:'of', chooseScent:'Choose a scent', all:'All',
+    yourLogo:'Your logo', step:'Step', of:'of', chooseScent:'Please choose a scent.', all:'All',
     surchargeHint:'one-time +€30.00 per configuration', done:'Configuration ready',
     doneNote:'Your configuration is complete and prepared for the next step.', edit:'Edit',
-    cord:'Cord: black (fixed)', checkout:'Checkout', loading:'Preparing…', checkoutErr:'The configuration could not be prepared for checkout. Please try again.' },
+    cord:'Cord: black (fixed)' },
   fr:{ collection:'Collection', qty:'Quantité', qtyOther:'Autre quantité', scent:'Parfum', intensity:'Intensité du parfum',
     normal:'Normal', intense:'Intense', shape:'Forme', front:'Recto', back:'Verso',
     identical:'Recto et verso identiques', review:'Vérification', designTeam:'Remarques pour notre équipe design',
@@ -55,10 +77,10 @@ const L = {
     identicalShort:'identique', ready:'Prêt pour vérification', incomplete:'Incomplet',
     previewNote:'L’aperçu est indicatif. Le fichier d’impression final est vérifié par notre équipe design.',
     deferredNote:'La forme de production finale est préparée par notre équipe design à partir de votre fichier.',
-    yourLogo:'Votre logo', step:'Étape', of:'sur', chooseScent:'Choisir un parfum', all:'Tous',
+    yourLogo:'Votre logo', step:'Étape', of:'sur', chooseScent:'Veuillez choisir un parfum.', all:'Tous',
     surchargeHint:'+30,00 € une seule fois par configuration', done:'Configuration prête',
     doneNote:'Votre configuration est complète et préparée pour l’étape suivante.', edit:'Modifier',
-    cord:'Cordon : noir (fixe)', checkout:'Passer à la caisse', loading:'Préparation…', checkoutErr:'La configuration n’a pas pu être préparée pour le paiement. Veuillez réessayer.' },
+    cord:'Cordon : noir (fixe)' },
 } as const;
 
 const catLabel: Record<Locale,Record<string,string>> = {
@@ -70,7 +92,7 @@ const catLabel: Record<Locale,Record<string,string>> = {
 function ShapePreview({ shape, artwork, yourLogo }:{ shape:ShapeId; artwork:ArtworkRef|null; yourLogo:string }) {
   const geo = shapeGeometry(shape);
   const cid = `clip-${shape}-${Math.random().toString(36).slice(2,7)}`;
-  if (!geo) { // deferred: neutral state, no faked contour
+  if (!geo) {
     return (<svg viewBox="0 0 100 120" role="img" aria-label="Form wird vom Designteam vorbereitet">
       <rect x="6" y="6" width="88" height="108" rx="10" fill="#EEF3FA" stroke="#B4690E" strokeDasharray="4 4" strokeWidth="1.5"/>
       <text x="50" y="62" textAnchor="middle" fontSize="7" fill="#8A5A12">BUGO</text></svg>);
@@ -91,6 +113,10 @@ function ShapePreview({ shape, artwork, yourLogo }:{ shape:ShapeId; artwork:Artw
 export default function Configurator({ locale, collections, scents, intenseCents, initialCollection }:
   { locale:Locale; collections:CfgCollection[]; scents:CfgScent[]; intenseCents:number; initialCollection?:string }) {
   const t = L[locale];
+  const T = sf(locale);
+  const cart = useStorefront();
+  const router = useRouter();
+
   const [collectionCode, setCollectionCode] = useState(initialCollection && collections.find(c=>c.collectionCode===initialCollection) ? initialCollection : collections[0]?.collectionCode);
   const col = collections.find(c=>c.collectionCode===collectionCode) ?? collections[0];
 
@@ -107,20 +133,43 @@ export default function Configurator({ locale, collections, scents, intenseCents
   const [backNotes, setBackNotes] = useState('');
   const [supporting, setSupporting] = useState<ArtworkRef[]>([]);
   const [step, setStep] = useState(0);
-  const [finished, setFinished] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [checkoutError, setCheckoutError] = useState<string|null>(null);
+  const [adding, setAdding] = useState(false);
+  const [stepError, setStepError] = useState<string|null>(null);
+  const [recover, setRecover] = useState<CfgDraft|null>(null);
+  const [hydrated, setHydrated] = useState(false);
+  const [exitOpen, setExitOpen] = useState(false);
+
   const configIdRef = useRef<string>('');
-  if (!configIdRef.current) configIdRef.current = (globalThis.crypto?.randomUUID?.() ?? `cfg-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  const donePathsRef = useRef<{ front?:string; back?:string; supporting:Record<number,string> }>({ supporting:{} });
+  if (!configIdRef.current) configIdRef.current = newConfigId();
 
   // configurator owns the mobile chrome: hide global bottom nav while active
   useEffect(()=>{ document.body.classList.add('cfg-active'); return ()=>document.body.classList.remove('cfg-active'); },[]);
-  // preselect from ?k= without making the route dynamic
-  useEffect(()=>{ try{ const k=new URLSearchParams(window.location.search).get('k');
-    if(k && collections.find(c=>c.collectionCode===k)) setCollectionCode(k); }catch{} },[collections]);
 
-  // scents available for the selected collection
+  // ---- draft restore (silent on continuation; recovery banner on fresh session return) ----
+  function applyDraft(d: CfgDraft) {
+    if (d.collectionCode && collections.find(c=>c.collectionCode===d.collectionCode)) setCollectionCode(d.collectionCode);
+    setQuantity(d.quantity || 1000); setQtyText(d.qtyText || '');
+    setScentCode(d.scentCode); setScentCat(d.scentCat || 'all');
+    setIntensity(d.intensity); setShape(d.shape);
+    setFront(refFromMeta(d.frontMeta)); setFrontNotes(d.frontNotes || '');
+    setSameBack(d.sameBack); setBack(refFromMeta(d.backMeta)); setBackNotes(d.backNotes || '');
+    setSupporting(d.supportingMeta.map(refFromMeta).filter(Boolean) as ArtworkRef[]);
+    setStep(Math.min(7, Math.max(0, d.step || 0)));
+  }
+  useEffect(()=>{
+    const d = loadDraft();
+    const live = getLive();
+    if (d && live === d.configId) { configIdRef.current = d.configId; applyDraft(d); setLive(d.configId); }
+    else if (isMeaningful(d) && d) { configIdRef.current = d.configId; setRecover(d); }
+    else {
+      try { const k = new URLSearchParams(window.location.search).get('k');
+        if (k && collections.find(c=>c.collectionCode===k)) setCollectionCode(k); } catch {}
+      setLive(configIdRef.current);
+    }
+    setHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+
   const available = useMemo(()=> scents.filter(s=> col?.scentCodes.includes(s.code)), [scents, col]);
   useEffect(()=>{ if(scentCode && !available.find(s=>s.code===scentCode)) setScentCode(null); },[available,scentCode]);
   const shownScents = scentCat==='all' ? available : available.filter(s=>s.category===scentCat);
@@ -130,54 +179,16 @@ export default function Configurator({ locale, collections, scents, intenseCents
   const qtyErr = validateQuantity(quantity, {min:1000,max:100000,step:1000});
   const backArtwork = sameBack ? front : back;
 
-  const STEPS = ['collection','qty','scent','intensity','shape','front','back','notesReview'];
-  const Y = 9; // presented as Schritt X von 9 (front/back/hinweise/prüfung counted for the customer)
+  const Y = 9;
+
+  // ---- file registry wrappers (binaries never persisted to localStorage) ----
+  function chooseFront(r:ArtworkRef|null){ setFront(r); setFrontFile(configIdRef.current, r?.file ?? null); }
+  function chooseBack(r:ArtworkRef|null){ setBack(r); setBackFile(configIdRef.current, r?.file ?? null); }
+  function addSupporting(r:ArtworkRef){ setSupporting(s=>{ const n=[...s,r]; setSupportingFiles(configIdRef.current, n.map(x=>x.file??null)); return n; }); }
+  function removeSupporting(i:number){ setSupporting(s=>{ const n=s.filter((_,j)=>j!==i); setSupportingFiles(configIdRef.current, n.map(x=>x.file??null)); return n; }); }
 
   function selectQuick(n:number){ setQuantity(n); setQtyText(''); }
   function applyQtyText(v:string){ setQtyText(v); const n=parseInt(v.replace(/\D/g,''),10); if(Number.isFinite(n)) setQuantity(n); }
-
-  function incoming() {
-    return { configId: configIdRef.current, locale, collectionCode: col.collectionCode, scentCode,
-      intensity, shape, quantity, frontInstructions: frontNotes, sameBackAsFront: sameBack,
-      backInstructions: sameBack ? '' : backNotes };
-  }
-  async function startCheckout() {
-    if (submitting) return;                       // double-click safety
-    setCheckoutError(null); setSubmitting(true);
-    try {
-      const cache = donePathsRef.current;
-      const fileFields: { field:string; name:string }[] = [];
-      if (front?.file && !cache.front) fileFields.push({ field:'front', name: front.name });
-      if (!sameBack && back?.file && !cache.back) fileFields.push({ field:'back', name: back.name });
-      supporting.forEach((f,i)=>{ if (f.file && !cache.supporting[i]) fileFields.push({ field:`supporting-${i}`, name: f.name }); });
-
-      const begun = await beginCheckout(incoming(), fileFields);
-      if (!begun.ok) { setCheckoutError(begun.message); setSubmitting(false); return; }
-
-      const paths: { frontPath?:string|null; backPath?:string|null; supporting?:{field:string;path:string}[] } = {
-        frontPath: cache.front ?? null, backPath: cache.back ?? null,
-        supporting: Object.entries(cache.supporting).map(([i,path])=>({ field:`supporting-${i}`, path })),
-      };
-      if (begun.uploads.length) {
-        const sb = createSupabaseBrowserClient();
-        if (!sb) { setCheckoutError(t.checkoutErr); setSubmitting(false); return; }
-        for (const u of begun.uploads) {
-          const file = u.field==='front' ? front?.file
-            : u.field==='back' ? back?.file
-            : supporting[Number(u.field.split('-')[1])]?.file;
-          if (!file) continue;
-          const { error } = await sb.storage.from(begun.bucket).uploadToSignedUrl(u.path, u.token, file);
-          if (error) { setCheckoutError(t.checkoutErr); setSubmitting(false); return; }
-          if (u.field==='front') { paths.frontPath = u.path; cache.front = u.path; }
-          else if (u.field==='back') { paths.backPath = u.path; cache.back = u.path; }
-          else { paths.supporting!.push({ field:u.field, path:u.path }); cache.supporting[Number(u.field.split('-')[1])] = u.path; }
-        }
-      }
-      const fin = await finalizeCheckout(incoming(), paths);
-      if (!fin.ok) { setCheckoutError(fin.message); setSubmitting(false); return; }
-      window.location.href = fin.checkoutUrl;      // Shopify owns checkout
-    } catch { setCheckoutError(t.checkoutErr); setSubmitting(false); }
-  }
 
   const buildConfig = (): BugoConfiguration => ({
     productId: col.productId, collectionCode: col.collectionCode, quantity,
@@ -188,11 +199,129 @@ export default function Configurator({ locale, collections, scents, intenseCents
     currency:'EUR', locale,
   });
 
-  const scentName = scents.find(s=>s.code===scentCode)?.name;
+  const currentDraft = (): CfgDraft => ({
+    v:1, configId: configIdRef.current, collectionCode,
+    quantity, qtyText, scentCode, scentCat, intensity, shape,
+    frontMeta: metaOf(front), frontNotes, sameBack, backMeta: metaOf(back), backNotes,
+    supportingMeta: supporting.map(s=>({ name:s.name, type:s.type, size:s.size })),
+    step, locale, updatedAt: Date.now(),
+  });
+
+  // ---- autosave (debounced) ----
+  const saveTimer = useRef<ReturnType<typeof setTimeout>|null>(null);
+  useEffect(()=>{
+    if (!hydrated || recover) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(()=> saveDraft(currentDraft()), 300);
+    return ()=>{ if (saveTimer.current) clearTimeout(saveTimer.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[hydrated, recover, collectionCode, quantity, qtyText, scentCode, scentCat, intensity, shape, front, frontNotes, sameBack, back, backNotes, supporting, step]);
+
+  // clear inline step error when the relevant inputs / step change
+  useEffect(()=>{ setStepError(null); },[step, front, frontNotes, back, backNotes, scentCode, quantity, sameBack]);
+
+  const scentName = scents.find(s=>s.code===scentCode)?.name ?? null;
   const shapeLabel = SHAPES.find(s=>s.id===shape)?.labelDe;
   const designStatus = front && frontNotes.trim() && (sameBack || (back && backNotes.trim())) ? t.ready : t.incomplete;
 
-  // ---- blocks (desktop shows all; mobile shows current step only) ----
+  // ---- validation ----
+  function mobileStepError(s:number): string|null {
+    if (s===1 && qtyErr) return quantityMessage(qtyErr, locale);
+    if (s===2 && !scentCode) return t.chooseScent;
+    if (s===5) { if (!front) return T.reqFrontFile; if (!frontNotes.trim()) return T.reqFrontNotes; }
+    if (s===6 && !sameBack) { if (!back) return T.reqBackFile; if (!backNotes.trim()) return T.reqBackNotes; }
+    return null;
+  }
+  function next(){
+    const err = mobileStepError(step);
+    if (err) { setStepError(err); return; }
+    setStepError(null); setStep(s=>Math.min(7,s+1));
+  }
+  function errStep(e:ConfigError): number {
+    switch(e){ case 'quantity':return 1; case 'scent':return 2; case 'shape':return 4;
+      case 'front_file': case 'front_instructions': return 5;
+      case 'back_file': case 'back_instructions': return 6; default:return 7; }
+  }
+  function errMessage(e:ConfigError): string {
+    switch(e){ case 'quantity':return quantityMessage(qtyErr, locale) ?? '';
+      case 'scent':return t.chooseScent;
+      case 'front_file':return T.reqFrontFile; case 'front_instructions':return T.reqFrontNotes;
+      case 'back_file':return T.reqBackFile; case 'back_instructions':return T.reqBackNotes; default:return ''; }
+  }
+
+  // ---- cart ----
+  const addedRef = useRef(false);
+  function buildCartItem(): CartItem {
+    return {
+      cartItemId: `ci-${configIdRef.current}`, configId: configIdRef.current,
+      productId: col.productId, collectionCode: col.collectionCode, collectionName: col.collectionName,
+      quantity, scentCode, scentName, intensity, shape, shapeLabel: SHAPE_L[shape][locale],
+      frontName: front?.name ?? null, frontMeta: metaOf(front), frontInstructions: frontNotes,
+      sameBackAsFront: sameBack,
+      backName: sameBack ? null : (back?.name ?? null), backMeta: sameBack ? null : metaOf(back),
+      backInstructions: sameBack ? '' : backNotes,
+      frontPath:null, backPath:null, supporting:[], filesPersisted:false,
+      basePriceCents: base, surchargeCents: total-base, priceCents: total, currency:'EUR', locale, updatedAt: Date.now(),
+    };
+  }
+  function addToCart(){
+    if (adding) return;
+    const e = firstConfigError(buildConfig());
+    if (e) { setStep(errStep(e)); setStepError(errMessage(e)); return; }
+    setAdding(true);
+    const item = buildCartItem();
+    cart.addOrUpdate(item);
+    addedRef.current = true;
+    setExitOpen(false);
+    cart.openCart();
+    setAdding(false);
+    // best-effort: upload artwork to the configuration's storage so the cart holds path refs
+    persistItemFiles(item).then(res=>{
+      if (res.ok) cart.addOrUpdate({ ...item, frontPath:res.frontPath, backPath:res.backPath, supporting:res.supporting, filesPersisted:true });
+    }).catch(()=>{});
+  }
+
+  // ---- recovery banner actions ----
+  function continueDraft(){ if (recover){ applyDraft(recover); setLive(recover.configId); } setRecover(null); }
+  function resetDraft(){
+    clearDraft(); const id = newConfigId(); configIdRef.current = id; setLive(id);
+    setCollectionCode(collections[0]?.collectionCode); setQuantity(1000); setQtyText('');
+    setScentCode(null); setScentCat('all'); setIntensity('normal'); setShape('rectangle');
+    setFront(null); setFrontNotes(''); setSameBack(true); setBack(null); setBackNotes(''); setSupporting([]); setStep(0);
+    setRecover(null);
+  }
+
+  // ---- exit intent (desktop mouse-leave + idle) + conservative unload guard ----
+  const stateRef = useRef({ meaningful:false, added:false });
+  stateRef.current = {
+    meaningful: step>0 || !!scentCode || !!front || !!frontNotes.trim(),
+    added: addedRef.current,
+  };
+  const exitShown = useRef(false);
+  function maybeExit(){
+    if (exitShown.current) return;
+    if (!stateRef.current.meaningful || stateRef.current.added) return;
+    exitShown.current = true; setExitOpen(true);
+  }
+  useEffect(()=>{
+    function onMouseOut(e:MouseEvent){ if (e.clientY<=0 && !e.relatedTarget) maybeExit(); }
+    document.addEventListener('mouseout', onMouseOut);
+    let idle = setTimeout(function tick(){ maybeExit(); }, 120000);
+    const reset = ()=>{ clearTimeout(idle); idle = setTimeout(()=>maybeExit(), 120000); };
+    window.addEventListener('pointerdown', reset, { passive:true });
+    window.addEventListener('keydown', reset);
+    function onUnload(e:BeforeUnloadEvent){
+      if (stateRef.current.meaningful && !stateRef.current.added && hasSessionFiles(configIdRef.current)) { e.preventDefault(); e.returnValue=''; }
+    }
+    window.addEventListener('beforeunload', onUnload);
+    return ()=>{ document.removeEventListener('mouseout', onMouseOut); clearTimeout(idle);
+      window.removeEventListener('pointerdown', reset); window.removeEventListener('keydown', reset);
+      window.removeEventListener('beforeunload', onUnload); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+
+  const canAdd = designStatus===t.ready && !qtyErr && !!scentCode;
+
   const block = (idx:number, node:ReactNode) => (
     <div className={`cfg__block${step===idx?' is-current':''}`} data-step={idx}>{node}</div>
   );
@@ -200,10 +329,20 @@ export default function Configurator({ locale, collections, scents, intenseCents
   return (
     <section className="section cfg">
       <div className="container">
+        {recover && (
+          <div className="cfg-recover" role="dialog" aria-label={T.recoverTitle}>
+            <div><b>{T.recoverTitle}</b><p className="muted" style={{marginTop:'.15rem'}}>{T.recoverBody}</p></div>
+            <div className="cfg-recover__row">
+              <button type="button" className="btn btn--primary btn--sm" onClick={continueDraft}>{T.recoverContinue}</button>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={resetDraft}>{T.recoverReset}</button>
+            </div>
+          </div>
+        )}
         <div className="cfg-progress" aria-hidden="false">
           <span>{t.step} {step+1} {t.of} {Y}</span>
           <div className="cfg-progress__track"><div className="cfg-progress__fill" style={{width:`${((step+1)/Y)*100}%`}}/></div>
         </div>
+        <p className="cfg-autosave" role="status">{T.autosave}</p>
         <div className="cfg__grid">
           <div className="cfg__panel">
             {block(0, <><div className="cfg__legend">{t.collection}</div>
@@ -266,7 +405,7 @@ export default function Configurator({ locale, collections, scents, intenseCents
               {isDeferred(shape) && <p className="deferred-note">{t.deferredNote}</p>}</>)}
 
             {block(5, <><div className="cfg__legend">{t.front}</div>
-              <Upload id="up-front" label={t.uploadFront} value={front} onChange={setFront}/>
+              <Upload id="up-front" label={t.uploadFront} value={front} onChange={chooseFront} locale={locale}/>
               <div className="field" style={{marginTop:'.75rem'}}>
                 <label htmlFor="fn">{t.frontNotes} · {t.designTeam}</label>
                 <textarea id="fn" className="textarea" rows={3} placeholder={t.ph} value={frontNotes} onChange={e=>setFrontNotes(e.target.value)}/>
@@ -279,7 +418,7 @@ export default function Configurator({ locale, collections, scents, intenseCents
                 <b style={{fontWeight:500}}>{t.identical}</b>
               </label>
               {!sameBack && <div style={{marginTop:'.75rem'}}>
-                <Upload id="up-back" label={t.uploadBack} value={back} onChange={setBack}/>
+                <Upload id="up-back" label={t.uploadBack} value={back} onChange={chooseBack} locale={locale}/>
                 <div className="field" style={{marginTop:'.75rem'}}>
                   <label htmlFor="bn">{t.backNotes}</label>
                   <textarea id="bn" className="textarea" rows={3} placeholder={t.ph} value={backNotes} onChange={e=>setBackNotes(e.target.value)}/>
@@ -287,9 +426,9 @@ export default function Configurator({ locale, collections, scents, intenseCents
               </div>}
               <div style={{marginTop:'.75rem'}}>
                 <div className="cfg__legend">{t.supporting}</div>
-                <Upload id="up-sup" label={t.supporting} multiple onAdd={r=>setSupporting(s=>[...s,r])}/>
+                <Upload id="up-sup" label={t.supporting} multiple onAdd={addSupporting} locale={locale}/>
                 {supporting.map((f,i)=>(<div key={i} style={{marginTop:'.4rem'}}>
-                  <Upload id={`sup-${i}`} label="" value={f} onChange={()=>setSupporting(s=>s.filter((_,j)=>j!==i))}/></div>))}
+                  <Upload id={`sup-${i}`} label="" value={f} onChange={()=>removeSupporting(i)} locale={locale}/></div>))}
               </div></>)}
 
             {block(7, <><div className="cfg__legend">{t.review}</div>
@@ -298,36 +437,59 @@ export default function Configurator({ locale, collections, scents, intenseCents
                 front={front} sameBack={sameBack} back={back} designStatus={designStatus}
                 base={base} total={total} onEdit={setStep} inline/>
               <button type="button" className="btn btn--primary btn--lg" style={{marginTop:'var(--s-5)'}}
-                disabled={submitting || designStatus!==t.ready || !!qtyErr || !scentCode}
-                aria-busy={submitting} onClick={startCheckout}>
-                {submitting ? t.loading : t.checkout}</button>
-              {checkoutError && <p className="cfg-error" role="alert" style={{marginTop:'var(--s-4)'}}>{checkoutError}</p>}
+                disabled={adding || !canAdd} aria-busy={adding} onClick={addToCart}>
+                {adding ? T.preparing : T.addToCart}</button>
+              {stepError && <p className="cfg-error" role="alert" style={{marginTop:'var(--s-4)'}}>{stepError}</p>}
             </>)}
           </div>
 
-          {/* live preview + summary (desktop sticky) */}
           <aside className="preview" aria-label="Vorschau">
             <div className="preview__tags">
               <div className="ptag"><span className="ptag__cord"/><div className="ptag__stage"><ShapePreview shape={shape} artwork={front} yourLogo={t.yourLogo}/></div><span className="ptag__label">{t.front}</span></div>
               <div className="ptag"><span className="ptag__cord"/><div className="ptag__stage"><ShapePreview shape={shape} artwork={backArtwork} yourLogo={t.yourLogo}/></div><span className="ptag__label">{t.back}{sameBack?` · ${t.identicalShort}`:''}</span></div>
             </div>
             <p className="preview__note">{t.previewNote}</p>
+            <p className="cfg-autosave cfg-autosave--aside">{T.autosave}</p>
             <Summary locale={locale} t={t} colName={col?.collectionName} quantity={quantity}
               scentName={scentName} intensity={intensity} shapeLabel={shapeLabel}
               front={front} sameBack={sameBack} back={back} designStatus={designStatus}
               base={base} total={total} onEdit={setStep}/>
+            <button type="button" className="btn btn--primary btn--block" style={{marginTop:'var(--s-4)'}}
+              disabled={adding || !canAdd} aria-busy={adding} onClick={addToCart}>
+              {adding ? T.preparing : T.addToCart}</button>
           </aside>
         </div>
       </div>
 
       {/* mobile contextual action bar */}
-      <div className="cfg__mobilebar">
-        {step>0 ? <button type="button" className="btn btn--ghost" onClick={()=>setStep(s=>Math.max(0,s-1))}>{t.prev}</button> : <span/>}
-        <span className="price">{formatMoney(total,'EUR',locale)}</span>
-        {step<7
-          ? <button type="button" className="btn btn--primary" onClick={()=>setStep(s=>Math.min(7,s+1))}>{t.next} →</button>
-          : <button type="button" className="btn btn--primary" disabled={submitting || designStatus!==t.ready || !!qtyErr || !scentCode} aria-busy={submitting} onClick={startCheckout}>{submitting ? t.loading : t.checkout}</button>}
+      <div className="cfg__mobilebar-wrap">
+        {stepError && <p className="cfg-error cfg-error--bar" role="alert">{stepError}</p>}
+        <div className="cfg__mobilebar">
+          {step>0 ? <button type="button" className="btn btn--ghost" onClick={()=>setStep(s=>Math.max(0,s-1))}>{t.prev}</button> : <span/>}
+          <span className="price">{formatMoney(total,'EUR',locale)}</span>
+          {step<7
+            ? <button type="button" className="btn btn--primary" onClick={next}>{t.next} →</button>
+            : <button type="button" className="btn btn--primary" disabled={adding || !canAdd} aria-busy={adding} onClick={addToCart}>{adding ? T.preparing : T.addToCart}</button>}
+        </div>
       </div>
+
+      {exitOpen && (
+        <div className="sfmodal is-open" aria-hidden="false">
+          <div className="sfmodal__scrim" onClick={()=>setExitOpen(false)} />
+          <div className="sfmodal__panel exit" role="dialog" aria-modal="true" aria-label={T.exitTitle}>
+            <button className="sficon exit__close" aria-label={T.close} onClick={()=>setExitOpen(false)}>×</button>
+            <h3>{T.exitTitle}</h3>
+            <p className="muted">{T.exitBody}</p>
+            <div className="exit__actions">
+              <button className="btn btn--primary btn--block" onClick={()=>setExitOpen(false)}>{T.exitContinue}</button>
+              <button className="btn btn--ghost btn--block" disabled={!canAdd} onClick={addToCart}>{T.exitSave}</button>
+              <a className="btn btn--ghost btn--block" href={`https://wa.me/${WA.design}`} target="_blank" rel="noopener noreferrer">{T.exitDesign}</a>
+              <a className="btn btn--ghost btn--block" href={`https://wa.me/${WA.support}`} target="_blank" rel="noopener noreferrer">{T.exitSupport}</a>
+              <a className="btn btn--ghost btn--block" href={`mailto:${business.adminNotificationEmail}`}>{business.adminNotificationEmail}</a>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

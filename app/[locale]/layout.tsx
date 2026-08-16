@@ -13,6 +13,8 @@ import MobileNav from '@/components/layout/MobileNav';
 import CookieBar from '@/components/layout/CookieBar';
 import AnnouncementBar from '@/components/layout/AnnouncementBar';
 import { getHome } from '@/data/seed/homepage';
+import { StorefrontProvider } from '@/lib/cart/store';
+import Overlays from '@/components/storefront/Overlays';
 
 export function generateStaticParams() { return locales.map(locale => ({ locale })); }
 
@@ -50,12 +52,15 @@ export default function LocaleLayout({ children, params }:
         <meta name="theme-color" content="#1268E8" />
       </head>
       <body>
-        <AnnouncementBar text={home.announcement} />
-        <Header locale={locale} dict={dict} nav={nav} alternates={homeAlternates()} />
-        <main className="pb-mobnav">{children}</main>
-        <Footer locale={locale} dict={dict} />
-        <MobileNav locale={locale} dict={dict} />
-        <CookieBar dict={dict} />
+        <StorefrontProvider>
+          <AnnouncementBar text={home.announcement} />
+          <Header locale={locale} dict={dict} nav={nav} alternates={homeAlternates()} />
+          <main className="pb-mobnav">{children}</main>
+          <Footer locale={locale} dict={dict} />
+          <MobileNav locale={locale} dict={dict} />
+          <CookieBar dict={dict} />
+          <Overlays locale={locale} dict={dict} alternates={homeAlternates()} />
+        </StorefrontProvider>
       </body>
     </html>
   );
