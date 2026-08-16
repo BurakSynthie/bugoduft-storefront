@@ -1,9 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 export default function LoginForm() {
-  const router = useRouter();
   const [email,setEmail]=useState(''); const [pw,setPw]=useState('');
   const [busy,setBusy]=useState(false); const [err,setErr]=useState<string|null>(null);
   async function submit() {
@@ -12,7 +10,7 @@ export default function LoginForm() {
     if (!sb) { setErr('Supabase yapılandırılmadı.'); setBusy(false); return; }
     const { error } = await sb.auth.signInWithPassword({ email, password: pw });
     if (error) { setErr('Giriş başarısız. E-posta veya şifre hatalı.'); setBusy(false); return; }
-    router.replace('/admin'); router.refresh();
+    window.location.assign('/admin');   // full nav => new auth cookie reaches middleware/server
   }
   return (
     <div className="adm-panel" style={{maxWidth:380,margin:'10vh auto'}}>
