@@ -1,0 +1,44 @@
+/* Admin UI (Turkish). Reuses design tokens from globals.css, own component layer. */
+.adm{min-height:100vh;display:grid;grid-template-columns:248px 1fr;background:var(--c-gray)}
+.adm__side{background:var(--c-ink);color:#C7CEDA;padding:var(--s-5) var(--s-4);position:sticky;top:0;height:100vh;overflow:auto}
+.adm__brand{color:#fff;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:.5rem;margin-bottom:var(--s-6)}
+.adm__brand .logo__mark{width:24px;height:24px}
+.adm__navlabel{font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:#69707E;margin:var(--s-5) 0 var(--s-2)}
+.adm__nav a{display:block;padding:.55rem .7rem;border-radius:9px;color:#C7CEDA;font-size:.9rem;font-weight:500}
+.adm__nav a:hover{background:#1B1E25;color:#fff}
+.adm__nav a[aria-current="page"]{background:var(--c-blue);color:#fff}
+.adm__main{padding:var(--s-6) clamp(1rem,3vw,2.5rem);min-width:0}
+.adm__top{display:flex;align-items:center;justify-content:space-between;gap:var(--s-4);margin-bottom:var(--s-6)}
+.adm__top h1{font-size:1.4rem}
+.adm__crumb{font-size:.82rem;color:var(--fg-muted)}
+.adm-cards{display:grid;gap:var(--s-4);grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.adm-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:var(--s-5)}
+.adm-card .k{font-size:.8rem;color:var(--fg-muted)}
+.adm-card .v{font-size:1.7rem;font-weight:700;letter-spacing:-.02em;margin-top:.25rem}
+.adm-card .v.muted{color:var(--fg-muted);font-weight:600;font-size:1.1rem}
+.adm-note{background:#FFF7ED;border:1px solid #F4D9B0;color:#8A5A12;border-radius:12px;padding:.85rem 1rem;font-size:.88rem;display:flex;gap:.6rem;align-items:flex-start}
+.adm-panel{background:#fff;border:1px solid var(--border);border-radius:14px;padding:var(--s-5);margin-top:var(--s-5)}
+.adm-table{width:100%;border-collapse:collapse;font-size:.9rem}
+.adm-table th,.adm-table td{text-align:left;padding:.7rem .6rem;border-bottom:1px solid var(--border)}
+.adm-table th{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-muted)}
+.adm-tag{display:inline-flex;padding:.15rem .5rem;border-radius:999px;font-size:.72rem;font-weight:600;background:#E7F0FE;color:#0A57C2}
+.adm-tag--off{background:#F1F2F4;color:#6B7280}
+.adm-tabs{display:flex;gap:.35rem;border-bottom:1px solid var(--border);margin-bottom:var(--s-5)}
+.adm-tab{padding:.6rem .9rem;border:0;background:none;font:inherit;font-weight:600;color:var(--fg-muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.adm-tab[aria-selected="true"]{color:var(--c-blue);border-bottom-color:var(--c-blue)}
+.adm-grid2{display:grid;gap:var(--s-4)}@media(min-width:820px){.adm-grid2{grid-template-columns:1fr 1fr}}
+.adm-btn{display:inline-flex;align-items:center;gap:.4rem;padding:.6rem 1rem;border-radius:10px;font-weight:600;font-size:.9rem;border:1px solid var(--border);background:#fff;cursor:pointer}
+.adm-btn--primary{background:var(--c-blue);color:#fff;border-color:var(--c-blue)}
+.adm-btn--ghost:hover{border-color:var(--fg)}
+
+/* Phase 5 order status badges */
+.op{display:inline-flex;align-items:center;gap:.35rem;padding:.2rem .6rem;border-radius:999px;font-size:.74rem;font-weight:600}
+.op--received{background:#EAF1FC;color:#0A57C2}
+.op--design{background:#FFF3E0;color:#8A5A12}
+.op--production{background:#EDE7FB;color:#5B3FA6}
+.op--shipped{background:#E4F4EA;color:#157F4B}
+.adm-toolbar{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:var(--s-4);align-items:center}
+.adm-toolbar .input,.adm-toolbar .select{padding:.5rem .6rem}
+.adm-kv{display:grid;grid-template-columns:auto 1fr;gap:.4rem .9rem;font-size:.9rem}
+.adm-kv dt{color:var(--fg-muted)}.adm-kv dd{margin:0;font-weight:500}
+@media(max-width:760px){.adm{grid-template-columns:1fr}.adm__side{position:static;height:auto}}

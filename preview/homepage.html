@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="de-DE"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BUGO DUFT — Homepage (Vorschau)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>/* =====================================================================
+   BUGO DUFT — global stylesheet (design tokens + component classes)
+   Single source of truth. Light-first, BUGO blue/black/white, German B2B.
+   Used by the Next app AND the static preview so they stay identical.
+   ===================================================================== */
+:root{
+  --c-blue:#1268E8; --c-blue-deep:#073A86; --c-ink:#101216; --c-graphite:#4F5661;
+  --c-gray:#F5F7FA; --c-border:#E4E8EE; --c-white:#FFFFFF; --c-dark:#090B0F;
+  --bg:var(--c-white); --bg-subtle:var(--c-gray); --bg-dark:var(--c-dark);
+  --fg:var(--c-ink); --fg-muted:var(--c-graphite); --fg-on-dark:#EDF1F7;
+  --accent:var(--c-blue); --accent-strong:var(--c-blue-deep); --border:var(--c-border);
+  --ok:#157F4B; --warn:#B4690E; --danger:#C0362C;
+  --font-sans:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --t-hero:clamp(2.5rem,5.5vw,4.75rem); --t-h2:clamp(1.6rem,2.6vw,2.25rem);
+  --t-h3:clamp(1.2rem,1.8vw,1.5rem); --t-eyebrow:.78rem;
+  --s-1:.25rem; --s-2:.5rem; --s-3:.75rem; --s-4:1rem; --s-5:1.5rem; --s-6:2rem;
+  --s-8:3rem; --s-10:4rem; --s-12:6rem; --s-16:8rem;
+  --r-btn:11px; --r-input:11px; --r-card:16px; --r-visual:22px; --r-full:999px;
+  --shadow-sm:0 1px 2px rgba(16,18,22,.05); --shadow-md:0 6px 20px rgba(16,18,22,.08);
+  --shadow-lg:0 18px 50px rgba(16,18,22,.12);
+  --e:cubic-bezier(.2,0,0,1); --container:1200px; --gutter:clamp(1rem,4vw,2.5rem);
+  --z-header:100; --z-drawer:200; --z-modal:300; --z-toast:400;
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);
+  font-size:1rem;line-height:1.6;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+h1,h2,h3,h4{line-height:1.12;letter-spacing:-.02em;margin:0;color:var(--fg);font-weight:600}
+p{margin:0}
+a{color:inherit;text-decoration:none}
+img{max-width:100%;height:auto;display:block}
+:where(a,button,input,select,textarea,[tabindex]):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important;scroll-behavior:auto!important}}
+
+/* layout */
+.container{max-width:var(--container);margin-inline:auto;padding-inline:var(--gutter)}
+.section{padding-block:clamp(3rem,7vw,6rem)}
+.section--tight{padding-block:clamp(2rem,4vw,3.5rem)}
+.section--dark{background:var(--bg-dark);color:var(--fg-on-dark)}
+.section--subtle{background:var(--bg-subtle)}
+.eyebrow{font-size:var(--t-eyebrow);font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--accent);display:inline-flex;align-items:center;gap:.55rem}
+.eyebrow::before{content:"";width:26px;height:2px;background:var(--accent);display:inline-block}
+.section--dark .eyebrow{color:#6FA8FF}.section--dark .eyebrow::before{background:#6FA8FF}
+.h2{font-size:var(--t-h2);font-weight:600;max-width:22ch}
+.lede{color:var(--fg-muted);max-width:56ch;margin-top:var(--s-4);font-size:1.05rem}
+.section--dark .lede{color:#AEB8C6}
+.grid{display:grid;gap:var(--s-5)}
+@media(min-width:640px){.grid-2{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:900px){.grid-3{grid-template-columns:repeat(3,1fr)}.grid-4{grid-template-columns:repeat(4,1fr)}}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;font-weight:600;
+  font-size:.95rem;padding:.8rem 1.35rem;border-radius:var(--r-btn);border:1px solid transparent;
+  cursor:pointer;transition:transform .15s var(--e),background .15s var(--e),box-shadow .15s var(--e);
+  white-space:nowrap;line-height:1}
+.btn:active{transform:translateY(1px)}
+.btn--primary{background:var(--accent);color:#fff}
+.btn--primary:hover{background:var(--accent-strong)}
+.btn--ghost{background:transparent;color:var(--fg);border-color:var(--border)}
+.btn--ghost:hover{border-color:var(--fg);}
+.btn--dark{background:var(--c-ink);color:#fff}.btn--dark:hover{background:#000}
+.btn--on-dark{background:#fff;color:var(--c-ink)}
+.btn--lg{padding:1rem 1.7rem;font-size:1rem}
+.btn--block{width:100%}
+
+/* header */
+.ann{background:var(--c-ink);color:#fff;font-size:.82rem;text-align:center;padding:.5rem var(--gutter)}
+.ann a{color:#8FB8FF;font-weight:600}
+.header{position:sticky;top:0;z-index:var(--z-header);background:rgba(255,255,255,.9);
+  backdrop-filter:saturate(160%) blur(10px);border-bottom:1px solid transparent;transition:border-color .2s,box-shadow .2s,padding .2s}
+.header--scrolled{border-color:var(--border);box-shadow:var(--shadow-sm)}
+.header__inner{display:flex;align-items:center;gap:var(--s-6);height:68px}
+.header--scrolled .header__inner{height:58px}
+.logo{font-weight:700;letter-spacing:-.03em;font-size:1.2rem;display:inline-flex;align-items:center;gap:.5rem}
+.logo__mark{width:26px;height:26px;border-radius:7px;background:var(--accent);position:relative;flex:none}
+.logo__mark::after{content:"";position:absolute;inset:7px;border:2px solid #fff;border-radius:3px}
+.nav{display:none;gap:var(--s-5);margin-inline:auto}
+.nav a{font-size:.92rem;color:var(--fg-muted);font-weight:500;padding:.3rem 0;position:relative}
+.nav a:hover{color:var(--fg)}
+.nav a::after{content:"";position:absolute;left:0;right:100%;bottom:-2px;height:2px;background:var(--accent);transition:right .2s var(--e)}
+.nav a:hover::after{right:0}
+.header__actions{display:flex;align-items:center;gap:var(--s-3);margin-left:auto}
+.iconbtn{width:40px;height:40px;border-radius:var(--r-btn);border:1px solid var(--border);background:#fff;
+  display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--fg)}
+.iconbtn:hover{border-color:var(--fg)}
+.switch{display:inline-flex;border:1px solid var(--border);border-radius:var(--r-btn);overflow:hidden;font-size:.82rem;font-weight:600}
+.switch button{padding:.45rem .6rem;background:#fff;border:0;cursor:pointer;color:var(--fg-muted)}
+.switch button[aria-current="true"]{background:var(--c-gray);color:var(--fg)}
+.burger{display:inline-flex}
+@media(min-width:1024px){.nav{display:flex}.burger{display:none}}
+
+/* hero */
+.hero{position:relative;overflow:hidden}
+.hero__grid{display:grid;gap:var(--s-8);align-items:center}
+@media(min-width:960px){.hero__grid{grid-template-columns:1.05fr .95fr}}
+.hero h1{font-size:var(--t-hero);font-weight:700;letter-spacing:-.035em}
+.hero h1 .accent{color:var(--accent)}
+.hero__sub{margin-top:var(--s-5);color:var(--fg-muted);font-size:1.1rem;max-width:46ch}
+.hero__cta{margin-top:var(--s-6);display:flex;gap:var(--s-3);flex-wrap:wrap}
+.hero__points{margin-top:var(--s-6);display:flex;flex-wrap:wrap;gap:var(--s-2) var(--s-5);color:var(--fg-muted);font-size:.9rem}
+.hero__points span{display:inline-flex;align-items:center;gap:.4rem}
+.hero__visual{position:relative;aspect-ratio:4/5;border-radius:var(--r-visual);
+  background:linear-gradient(160deg,#EAF1FC,#D7E6FB 60%,#C9DDF9);border:1px solid var(--border);
+  box-shadow:var(--shadow-lg);overflow:hidden}
+/* precision-grid signature motif (manufacturing competence) */
+.hero__visual::before{content:"";position:absolute;inset:0;background-image:
+  linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:34px 34px;opacity:.5;mask-image:radial-gradient(120% 90% at 70% 30%,#000 40%,transparent 80%)}
+.hero__tag{position:absolute;left:8%;top:14%;width:56%;aspect-ratio:5/7;border-radius:16px;background:#fff;
+  box-shadow:var(--shadow-md);border:1px solid var(--border);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:.4rem;transform:rotate(-4deg)}
+.hero__tag::before{content:"";width:8px;height:8px;border-radius:50%;border:2px solid var(--c-ink);position:absolute;top:8%}
+.hero__tag b{font-size:1.4rem;letter-spacing:-.02em}
+.hero__tag small{color:var(--fg-muted);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase}
+
+/* cards */
+.card{background:#fff;border:1px solid var(--border);border-radius:var(--r-card);overflow:hidden;
+  transition:transform .22s var(--e),box-shadow .22s var(--e),border-color .22s var(--e)}
+.card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);border-color:#D2DAE6}
+.ccard__media{aspect-ratio:4/3;background:linear-gradient(150deg,#EAF1FC,#D2E2FA);position:relative}
+.ccard__media[data-c="PREMIUM"]{background:linear-gradient(150deg,#E7EEF9,#C7D8F2)}
+.ccard__media[data-c="DELUXE"]{background:linear-gradient(150deg,#E9EAEE,#CDD3DE)}
+.ccard__media[data-c="VIP"]{background:linear-gradient(150deg,#0E1B33,#24406F)}
+.ccard__body{padding:var(--s-5)}
+.ccard__row{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s-3)}
+.ccard h3{font-size:1.15rem}
+.price{font-weight:700;font-size:1.05rem;letter-spacing:-.01em}
+.price small{display:block;font-weight:500;font-size:.72rem;color:var(--fg-muted);letter-spacing:.02em}
+.badge{display:inline-flex;align-items:center;gap:.35rem;font-size:.72rem;font-weight:600;
+  padding:.25rem .55rem;border-radius:var(--r-full);background:var(--c-gray);color:var(--fg-muted)}
+.badge--accent{background:#E7F0FE;color:var(--accent-strong)}
+
+/* steps / timeline */
+.steps{counter-reset:s;display:grid;gap:var(--s-5)}
+@media(min-width:900px){.steps--4{grid-template-columns:repeat(4,1fr)}}
+.step{position:relative;padding-top:var(--s-6)}
+.step__n{font-variant-numeric:tabular-nums;font-weight:700;color:var(--accent);font-size:.9rem;letter-spacing:.1em}
+.step h3{font-size:1.05rem;margin-top:.4rem}
+.step p{color:var(--fg-muted);margin-top:.3rem;font-size:.92rem}
+.timeline{display:grid;gap:0}
+.tl{display:grid;grid-template-columns:auto 1fr;gap:var(--s-4);padding:var(--s-4) 0;border-top:1px solid var(--border)}
+.tl__dot{width:14px;height:14px;border-radius:50%;border:3px solid var(--accent);margin-top:.35rem}
+.tl b{font-weight:600}.tl span{color:var(--fg-muted);font-size:.92rem}
+
+/* chips / scents */
+.chips{display:flex;flex-wrap:wrap;gap:var(--s-2)}
+.chip{border:1px solid var(--border);background:#fff;border-radius:var(--r-full);padding:.5rem .9rem;
+  font-size:.88rem;font-weight:500;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--c-ink);color:#fff;border-color:var(--c-ink)}
+.scentgrid{display:grid;gap:var(--s-3);grid-template-columns:repeat(2,1fr)}
+@media(min-width:720px){.scentgrid{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:1000px){.scentgrid{grid-template-columns:repeat(4,1fr)}}
+.scent{border:1px solid var(--border);border-radius:var(--r-card);padding:var(--s-4);background:#fff}
+.scent b{font-weight:600}.scent small{color:var(--fg-muted);display:block;margin-top:.15rem}
+
+/* faq */
+.faq{border-top:1px solid var(--border)}
+.faq details{border-bottom:1px solid var(--border)}
+.faq summary{cursor:pointer;list-style:none;padding:var(--s-4) 0;font-weight:600;display:flex;justify-content:space-between;gap:1rem}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";color:var(--accent);font-weight:700}
+.faq details[open] summary::after{content:"–"}
+.faq p{color:var(--fg-muted);padding-bottom:var(--s-4);max-width:70ch}
+
+/* forms */
+.field{display:flex;flex-direction:column;gap:.35rem;margin-bottom:var(--s-4)}
+.field label{font-size:.85rem;font-weight:600}
+.input,.select,.textarea{border:1px solid var(--border);border-radius:var(--r-input);padding:.75rem .85rem;
+  font:inherit;background:#fff;color:var(--fg)}
+.input:focus,.select:focus,.textarea:focus{border-color:var(--accent)}
+
+/* footer */
+.footer{background:var(--c-ink);color:#C7CEDA;padding-block:var(--s-10) var(--s-6)}
+.footer a{color:#C7CEDA}.footer a:hover{color:#fff}
+.footer__cols{display:grid;gap:var(--s-6);grid-template-columns:repeat(2,1fr)}
+@media(min-width:900px){.footer__cols{grid-template-columns:1.4fr repeat(4,1fr)}}
+.footer h4{color:#fff;font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;margin-bottom:var(--s-3)}
+.footer ul{list-style:none;padding:0;margin:0;display:grid;gap:.5rem;font-size:.9rem}
+.footer__bottom{border-top:1px solid #23262E;margin-top:var(--s-8);padding-top:var(--s-5);
+  display:flex;flex-wrap:wrap;gap:var(--s-3);justify-content:space-between;font-size:.82rem;color:#8B93A2}
+
+/* mobile bottom nav */
+.mobnav{position:fixed;left:0;right:0;bottom:0;z-index:var(--z-header);background:rgba(255,255,255,.94);
+  backdrop-filter:blur(10px);border-top:1px solid var(--border);
+  display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:var(--safe-bottom)}
+.mobnav a{display:flex;flex-direction:column;align-items:center;gap:.2rem;padding:.5rem 0;font-size:.66rem;color:var(--fg-muted)}
+.mobnav a b{width:22px;height:22px;display:grid;place-items:center}
+.mobnav .central{transform:translateY(-14px)}
+.mobnav .central b{width:52px;height:52px;border-radius:16px;background:var(--accent);color:#fff;box-shadow:var(--shadow-md)}
+.mobnav .central{color:var(--accent);font-weight:700}
+@media(min-width:1024px){.mobnav{display:none}}
+
+/* cookie bar */
+.cookie{position:fixed;left:var(--gutter);right:var(--gutter);bottom:calc(var(--s-4) + var(--safe-bottom));
+  z-index:var(--z-modal);max-width:520px;margin-inline:auto;background:#fff;border:1px solid var(--border);
+  border-radius:var(--r-card);box-shadow:var(--shadow-lg);padding:var(--s-5)}
+.cookie p{font-size:.88rem;color:var(--fg-muted)}
+.cookie__row{display:flex;gap:var(--s-2);flex-wrap:wrap;margin-top:var(--s-4)}
+
+/* reveal animation (transform/opacity only) */
+.reveal{opacity:0;transform:translateY(14px);transition:opacity .5s var(--e),transform .5s var(--e)}
+.reveal.in{opacity:1;transform:none}
+
+/* utilities */
+.muted{color:var(--fg-muted)}.center{text-align:center}
+.stack-6>*+*{margin-top:var(--s-6)}
+.mt-8{margin-top:var(--s-8)}.mt-6{margin-top:var(--s-6)}.mt-4{margin-top:var(--s-4)}
+.hide-mobile{display:none}@media(min-width:1024px){.hide-mobile{display:initial}}
+.pb-mobnav{padding-bottom:84px}@media(min-width:1024px){.pb-mobnav{padding-bottom:0}}
+
+.header{position:static}
+</style></head>
+<body><div class="ann">Individuelle Werbeduftanhänger · Mindestbestellmenge 1.000 Stück · Produktion in Deutschland</div>
+<header class="header header--scrolled"><div class="container header__inner">
+  <a class="logo" href="#"><span class="logo__mark"></span>BUGO&nbsp;DUFT</a>
+  <nav class="nav"><a href="#">Produkte</a><a href="#">Düfte</a><a href="#">Branchen</a><a href="#">Produktion</a><a href="#">FAQ</a></nav>
+  <div class="header__actions">
+    <div class="switch hide-mobile"><button aria-current="true">DE</button><button>EN</button><button>FR</button></div>
+    <div class="switch hide-mobile"><button aria-current="true">EUR</button></div>
+    <button class="iconbtn hide-mobile" aria-label="Suchen"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm10 2-4.3-4.3"/></svg></button>
+    <button class="iconbtn" aria-label="Warenkorb"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 12.4a1 1 0 0 0 1 .8h9.2a1 1 0 0 0 1-.8L21 8H6M10 21h.01M17 21h.01"/></svg></button>
+    <a class="btn btn--dark hide-mobile" href="#">Angebot anfragen</a>
+  </div>
+</div></header>
+<main class="pb-mobnav">
+  <section class="hero section"><div class="container"><div class="hero__grid">
+    <div>
+      <span class="eyebrow">Individuelle Werbedüfte · Made for your brand</span>
+      <h1 style="margin-top:var(--s-4)">Ihre Marke.<br>Ihr Design.<br><span class="accent">Ihr Duft.</span></h1>
+      <p class="hero__sub">Individuell gestaltete Duftanhänger für Ihr Unternehmen – mit Ihrem Logo, Ihrem Design und Ihrem Wunschduft. Ab 1.000 Stück, produziert in Deutschland.</p>
+      <div class="hero__cta"><a class="btn btn--primary btn--lg" href="#">Jetzt gestalten</a><a class="btn btn--ghost btn--lg" href="#">Angebot anfragen</a></div>
+      <div class="hero__points"><span>✓ Ab 1.000 Stück</span><span>✓ Produktion in Deutschland</span><span>✓ Designfreigabe inklusive</span></div>
+    </div>
+    <div class="hero__visual"><div class="hero__tag"><small>Your logo</small><b>BUGO</b></div></div>
+  </div></div></section>
+
+  <section class="section section--tight"><div class="container">
+    <div style="display:flex;gap:var(--s-4);flex-wrap:wrap;align-items:center;border:1px dashed var(--border);border-radius:var(--r-card);padding:var(--s-5)">
+      <strong>Kennzahlen</strong><span class="muted" style="font-size:.9rem">Kennzahlen werden aus verifizierten Betriebsdaten gepflegt.</span></div>
+  </div></section>
+
+  <section class="section section--subtle"><div class="container">
+    <header style="margin-bottom:var(--s-8)"><span class="eyebrow">Kollektionen</span><h2 class="h2" style="margin-top:var(--s-3)">Vier Kollektionen. Ein Ziel: Ihre Marke.</h2></header>
+    <div class="grid grid-4">
+      <article class="card ccard"><div class="ccard__media" data-c="STANDARD"></div>
+      <div class="ccard__body"><div class="ccard__row"><h3>Standard</h3></div>
+      <p class="muted" style="margin:.4rem 0 var(--s-4);font-size:.9rem">Der bewährte Werbeduftanhänger für hohe Auflagen.</p>
+      <div class="ccard__row"><span class="price">ab 269,00 €<small>pro Bestellung</small></span>
+      <a class="iconbtn" href="#" aria-label="Standard"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></div></article>
+      <article class="card ccard"><div class="ccard__media" data-c="PREMIUM"></div>
+      <div class="ccard__body"><div class="ccard__row"><h3>Premium</h3></div>
+      <p class="muted" style="margin:.4rem 0 var(--s-4);font-size:.9rem">Höhere Materialqualität und intensivere Duftveredelung.</p>
+      <div class="ccard__row"><span class="price">ab 279,00 €<small>pro Bestellung</small></span>
+      <a class="iconbtn" href="#" aria-label="Premium"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></div></article>
+      <article class="card ccard"><div class="ccard__media" data-c="DELUXE"></div>
+      <div class="ccard__body"><div class="ccard__row"><h3>Deluxe</h3></div>
+      <p class="muted" style="margin:.4rem 0 var(--s-4);font-size:.9rem">Gehobene Anmutung für anspruchsvolle Marken.</p>
+      <div class="ccard__row"><span class="price">ab 289,00 €<small>pro Bestellung</small></span>
+      <a class="iconbtn" href="#" aria-label="Deluxe"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></div></article>
+      <article class="card ccard"><div class="ccard__media" data-c="VIP"></div>
+      <div class="ccard__body"><div class="ccard__row"><h3>VIP</h3><span class="badge badge--accent">Top</span></div>
+      <p class="muted" style="margin:.4rem 0 var(--s-4);font-size:.9rem">Das Premiumsegment mit der größten Duftauswahl.</p>
+      <div class="ccard__row"><span class="price">ab 320,00 €<small>pro Bestellung</small></span>
+      <a class="iconbtn" href="#" aria-label="VIP"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></div></article>
+    </div>
+  </div></section>
+
+  <section class="section"><div class="container">
+    <header style="margin-bottom:var(--s-8)"><span class="eyebrow">So funktioniert’s</span><h2 class="h2" style="margin-top:var(--s-3)">In vier Schritten zum eigenen Duftanhänger</h2></header>
+    <div class="steps steps--4">
+      <div class="step"><span class="step__n">01</span><h3>Logo hochladen</h3><p>Laden Sie Ihr Logo als Druckdatei hoch – PDF, SVG, AI, EPS oder Bilddatei.</p></div>
+      <div class="step"><span class="step__n">02</span><h3>Duft auswählen</h3><p>Wählen Sie aus unseren Duftwelten den passenden Markenduft.</p></div>
+      <div class="step"><span class="step__n">03</span><h3>Design beschreiben</h3><p>Beschreiben Sie Vorder- und Rückseite, Form und optionale Angaben.</p></div>
+      <div class="step"><span class="step__n">04</span><h3>Bestellung abschließen</h3><p>Menge wählen, prüfen und Bestellung als Gast oder Geschäftskunde abschließen.</p></div>
+    </div>
+  </div></section>
+
+  <section class="section section--subtle"><div class="container">
+    <div class="card" style="padding:var(--s-8);display:grid;gap:var(--s-5)">
+      <div><span class="eyebrow">Konfigurator</span><h2 class="h2" style="margin-top:var(--s-3)">Konfigurieren Sie in Minuten</h2><p class="lede">Logo, Duft und Menge – der Rest folgt Schritt für Schritt.</p></div>
+      <div class="grid grid-3">
+        <div style="border:1px dashed var(--border);border-radius:var(--r-card);padding:var(--s-5);color:var(--fg-muted)">1 · Logo</div>
+        <div style="border:1px dashed var(--border);border-radius:var(--r-card);padding:var(--s-5);color:var(--fg-muted)">2 · Düfte</div>
+        <div style="border:1px dashed var(--border);border-radius:var(--r-card);padding:var(--s-5);color:var(--fg-muted)">3 · Menge</div>
+      </div>
+      <div><a class="btn btn--primary btn--lg" href="#">Vollständig konfigurieren</a></div>
+    </div>
+  </div></section>
+
+  <section class="section"><div class="container"><div style="max-width:780px">
+    <span class="eyebrow">Markenwirkung</span><h2 class="h2" style="margin-top:var(--s-3);max-width:20ch">Mehr als ein Duftanhänger. Eine Marke, die in Erinnerung bleibt.</h2>
+    <p class="lede">Sichtbarkeit, Duft und Wiedererkennung wirken zusammen: Ein individueller Duftanhänger verbindet Ihr Logo mit einem angenehmen Sinneseindruck – und bleibt so länger präsent als klassische Werbeträger.</p>
+  </div></div></section>
+
+  <section class="section section--subtle"><div class="container">
+    <header style="margin-bottom:var(--s-8)"><span class="eyebrow">Branchen</span><h2 class="h2" style="margin-top:var(--s-3)">Für Ihre Branche gemacht</h2></header>
+    <div class="grid grid-2">
+      <a class="card" href="#" style="padding:var(--s-6)"><h3 style="font-size:1.15rem">Werbeduftanhänger für Autohäuser</h3><p class="muted" style="margin-top:.5rem">Für jedes ausgelieferte Fahrzeug ein individueller Duftanhänger mit Ihrem Logo – ein bleibender Markenkontakt.</p></a>
+      <a class="card" href="#" style="padding:var(--s-6)"><h3 style="font-size:1.15rem">Duftanhänger für Werkstätten</h3><p class="muted" style="margin-top:.5rem">Nach jeder Inspektion ein frischer Markenduft im Fahrzeug Ihrer Kundschaft.</p></a>
+    </div>
+  </div></section>
+
+  <section class="section"><div class="container">
+    <header style="margin-bottom:var(--s-8)"><span class="eyebrow">Düfte</span><h2 class="h2" style="margin-top:var(--s-3)">Finden Sie Ihren Markenduft</h2><p class="lede">Von frisch bis intensiv – wählen Sie den Duft, der zu Ihrer Marke passt.</p></header>
+    <div class="chips" id="chips">
+      <button class="chip" aria-pressed="true" data-c="all">Alle</button><button class="chip" aria-pressed="false" data-c="frisch">Frisch</button>
+      <button class="chip" aria-pressed="false" data-c="fruchtig">Fruchtig</button><button class="chip" aria-pressed="false" data-c="suess">Süß</button>
+      <button class="chip" aria-pressed="false" data-c="elegant">Elegant</button><button class="chip" aria-pressed="false" data-c="intensiv">Intensiv</button>
+    </div>
+    <div class="scentgrid mt-6" id="scents">
+      <div class="scent" data-c="frisch"><b>Ocean Breeze</b><small>Frisch, maritim, klar</small></div>
+      <div class="scent" data-c="frisch"><b>Cotton Fresh</b><small>Sauber, weich, dezent</small></div>
+      <div class="scent" data-c="fruchtig"><b>Green Apple</b><small>Spritzig, fruchtig</small></div>
+      <div class="scent" data-c="fruchtig"><b>Black Cherry</b><small>Saftig, süßlich</small></div>
+      <div class="scent" data-c="fruchtig"><b>Mango</b><small>Exotisch, fruchtig</small></div>
+      <div class="scent" data-c="suess"><b>Vanilla</b><small>Warm, süß, cremig</small></div>
+      <div class="scent" data-c="suess"><b>Caramel</b><small>Süß, gebrannt</small></div>
+      <div class="scent" data-c="elegant"><b>Black Edition</b><small>Elegant, herb</small></div>
+      <div class="scent" data-c="elegant"><b>Oud Noir</b><small>Warm, holzig, edel</small></div>
+      <div class="scent" data-c="intensiv"><b>Espresso</b><small>Intensiv, röstig</small></div>
+    </div>
+  </div></section>
+
+  <section class="section section--subtle"><div class="container">
+    <header style="margin-bottom:var(--s-8)"><span class="eyebrow">Produktion</span><h2 class="h2" style="margin-top:var(--s-3)">Vom Auftrag bis zum Versand</h2></header>
+    <div class="timeline">
+      <div class="tl"><span class="tl__dot"></span><div><b>Auftrag</b><br><span>Bestellung und Design-Brief gehen ein.</span></div></div>
+      <div class="tl"><span class="tl__dot"></span><div><b>Designprüfung</b><br><span>Ihre Druckdaten werden geprüft und aufbereitet.</span></div></div>
+      <div class="tl"><span class="tl__dot"></span><div><b>Druck</b><br><span>Vollflächiger Druck Ihres Designs.</span></div></div>
+      <div class="tl"><span class="tl__dot"></span><div><b>Duftveredelung</b><br><span>Anhänger werden mit dem gewählten Duft veredelt.</span></div></div>
+      <div class="tl"><span class="tl__dot"></span><div><b>Qualitätskontrolle</b><br><span>Sicht- und Duftprüfung vor der Verpackung.</span></div></div>
+      <div class="tl"><span class="tl__dot"></span><div><b>Verpackung</b><br><span>Verpackung nach gewählter Option.</span></div></div>
+      <div class="tl"><span class="tl__dot"></span><div><b>Versand</b><br><span>Versand mit Sendungsverfolgung.</span></div></div>
+    </div>
+  </div></section>
+
+  <section class="section"><div class="container">
+    <header style="margin-bottom:var(--s-8)"><span class="eyebrow">Referenzen</span><h2 class="h2" style="margin-top:var(--s-3)">Ausgewählte Projekte</h2></header>
+    <div style="border:1px dashed var(--border);border-radius:var(--r-card);padding:var(--s-8);text-align:center"><p class="muted">Referenzen werden gepflegt und erscheinen hier, sobald sie freigegeben sind.</p></div>
+  </div></section>
+
+  <section class="section section--subtle"><div class="container">
+    <header style="margin-bottom:var(--s-8)"><span class="eyebrow">Warum BUGO</span><h2 class="h2" style="margin-top:var(--s-3)">Spezialist statt Baukasten</h2></header>
+    <div class="grid grid-4">
+      <div class="card" style="padding:var(--s-5)"><h3 style="font-size:1.05rem">Spezialisiert auf B2B</h3><p class="muted" style="margin-top:.4rem;font-size:.92rem">Fokus auf individuelle Werbeduftanhänger für Unternehmen – kein Bauchladen.</p></div>
+      <div class="card" style="padding:var(--s-5)"><h3 style="font-size:1.05rem">Produktion in Deutschland</h3><p class="muted" style="margin-top:.4rem;font-size:.92rem">Kurze Wege, verlässliche Termine, konsistente Qualität.</p></div>
+      <div class="card" style="padding:var(--s-5)"><h3 style="font-size:1.05rem">Designfreigabe inklusive</h3><p class="muted" style="margin-top:.4rem;font-size:.92rem">Sie geben jeden Druck vor der Produktion frei – kein Blindkauf.</p></div>
+      <div class="card" style="padding:var(--s-5)"><h3 style="font-size:1.05rem">Ab 1.000 Stück</h3><p class="muted" style="margin-top:.4rem;font-size:.92rem">Kalkulierbare Staffelpreise für hohe Auflagen.</p></div>
+    </div>
+  </div></section>
+
+  <section class="section"><div class="container">
+    <header style="margin-bottom:var(--s-8)"><span class="eyebrow">Preise</span><h2 class="h2" style="margin-top:var(--s-3)">Klare Startpreise pro Kollektion</h2></header>
+    <div class="grid grid-4">
+      <div class="card" style="padding:var(--s-5)"><h3 style="font-size:1.05rem">Standard</h3><div style="margin-top:var(--s-3)"><span class="price">ab 269,00 €<small>pro Bestellung</small></span></div></div>
+      <div class="card" style="padding:var(--s-5)"><h3 style="font-size:1.05rem">Premium</h3><div style="margin-top:var(--s-3)"><span class="price">ab 279,00 €<small>pro Bestellung</small></span></div></div>
+      <div class="card" style="padding:var(--s-5)"><h3 style="font-size:1.05rem">Deluxe</h3><div style="margin-top:var(--s-3)"><span class="price">ab 289,00 €<small>pro Bestellung</small></span></div></div>
+      <div class="card" style="padding:var(--s-5)"><h3 style="font-size:1.05rem">VIP</h3><div style="margin-top:var(--s-3)"><span class="price">ab 320,00 €<small>pro Bestellung</small></span></div></div>
+    </div>
+    <p class="muted" style="margin-top:var(--s-5);font-size:.85rem;max-width:72ch">Preise verstehen sich als Startpreise pro Bestellung. Endgültige Preis-, Versand- und Steuerangaben sind im Checkout ausgewiesen.</p>
+  </div></section>
+
+  <section class="section section--subtle"><div class="container"><div style="max-width:640px">
+    <header style="margin-bottom:var(--s-8)"><span class="eyebrow">Großbestellung</span><h2 class="h2" style="margin-top:var(--s-3)">Angebot für große Auflagen anfragen</h2><p class="lede">Sagen Sie uns, was Sie brauchen – wir melden uns mit einem individuellen Angebot.</p></header>
+    <div style="background:#fff;border:1px solid var(--border);border-radius:var(--r-card);padding:var(--s-6)">
+      <div class="field"><label>Firma</label><input class="input"></div>
+      <div class="grid grid-2"><div class="field"><label>E-Mail</label><input class="input" type="email"></div><div class="field"><label>Menge (Stück)</label><input class="input" placeholder="10000"></div></div>
+      <div class="field"><label>Nachricht</label><textarea class="textarea" rows="4"></textarea></div>
+      <a class="btn btn--primary btn--lg" href="#">Angebot anfragen</a>
+      <p class="muted" style="margin-top:var(--s-3);font-size:.82rem">Der E-Mail-Versand ist noch nicht konfiguriert – Ihre Anfrage wird noch nicht versendet.</p>
+    </div>
+  </div></div></section>
+
+  <section class="section section--subtle" style="padding-top:0"><div class="container"><div style="max-width:820px">
+    <header style="margin-bottom:var(--s-8)"><span class="eyebrow">FAQ</span><h2 class="h2" style="margin-top:var(--s-3)">Häufige Fragen</h2></header>
+    <div class="faq">
+      <details open><summary>Wie hoch ist die Mindestbestellmenge?</summary><p>Die Mindestbestellmenge beträgt 1.000 Stück. Bestellungen sind in 1.000er-Schritten bis maximal 100.000 Stück möglich.</p></details>
+      <details><summary>Welche Druckdaten benötige ich?</summary><p>Ideal sind vektorbasierte Dateien (PDF, SVG, AI, EPS). PNG/JPG sind möglich, sofern die Auflösung ausreicht.</p></details>
+      <details><summary>Kann ich das Design vor der Produktion freigeben?</summary><p>Ja. Sie erhalten einen Designentwurf zur Freigabe. Erst nach Ihrer Freigabe geht der Auftrag in Produktion.</p></details>
+    </div>
+  </div></div></section>
+
+  <section class="section section--dark"><div class="container"><div style="max-width:720px">
+    <h2 class="h2" style="color:#fff">Bereit, Ihre Marke zum Duft zu machen?</h2>
+    <p class="lede" style="margin-bottom:var(--s-6)">Gestalten Sie Ihren individuellen Duftanhänger oder fordern Sie ein unverbindliches Angebot an.</p>
+    <div style="display:flex;gap:var(--s-3);flex-wrap:wrap"><a class="btn btn--on-dark btn--lg" href="#">Jetzt gestalten</a><a class="btn btn--ghost btn--lg" href="#" style="color:#fff;border-color:#39414F">Angebot anfragen</a></div>
+  </div></div></section>
+</main>
+
+<footer class="footer"><div class="container">
+  <div class="footer__cols">
+    <div><a class="logo" href="#" style="color:#fff"><span class="logo__mark"></span>BUGO&nbsp;DUFT</a><p style="color:#8B93A2;margin-top:var(--s-4);max-width:32ch;font-size:.9rem">Mindestbestellmenge 1.000 Stück.</p></div>
+    <div><h4>Produkte</h4><ul><li><a href="#">Produkte</a></li><li><a href="#">Düfte</a></li><li><a href="#">Branchen</a></li><li><a href="#">Produktion</a></li></ul></div>
+    <div><h4>Service</h4><ul><li><a href="#">Kontakt</a></li><li><a href="#">FAQ</a></li><li><a href="#">Versand & Zahlung</a></li><li><a href="#">Bestellstatus</a></li></ul></div>
+    <div><h4>Unternehmen</h4><ul><li><a href="#">Über uns</a></li><li><a href="#">B2B</a></li><li><a href="#">Großbestellungen</a></li></ul></div>
+    <div><h4>Rechtliches</h4><ul><li><a href="#">Impressum</a></li><li><a href="#">Datenschutz</a></li><li><a href="#">AGB</a></li><li><a href="#">Widerrufsbelehrung</a></li></ul></div>
+  </div>
+  <div class="footer__bottom"><span>© 2026 BUGO DUFT. Alle Rechte vorbehalten.</span><span>Made for your brand · Germany</span></div>
+</div></footer>
+
+<nav class="mobnav" aria-label="Menü">
+  <a href="#"><b>⌂</b>Startseite</a><a href="#"><b>▦</b>Produkte</a>
+  <a class="central" href="#"><b>✦</b>Gestalten</a><a href="#"><b>❉</b>Düfte</a><a href="#"><b>≡</b>Menü</a>
+</nav>
+
+<script>
+document.querySelectorAll('#chips .chip').forEach(function(b){
+  b.addEventListener('click',function(){
+    document.querySelectorAll('#chips .chip').forEach(function(x){x.setAttribute('aria-pressed','false')});
+    b.setAttribute('aria-pressed','true');
+    var c=b.dataset.c;
+    document.querySelectorAll('#scents .scent').forEach(function(s){
+      s.style.display=(c==='all'||s.dataset.c===c)?'':'none';
+    });
+  });
+});
+</script>
+</body></html>
