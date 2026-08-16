@@ -24,7 +24,7 @@ export default async function OrdersList({ searchParams }:{ searchParams:{ q?:st
         <button className="adm-btn adm-btn--primary" type="submit">Uygula</button>
       </form>
       <div className="adm-panel">
-        <table className="adm-table">
+        <table className="adm-table adm-hide-mobile">
           <thead><tr><th>No</th><th>Müşteri / Firma</th><th>Ürün</th><th>Adet</th><th>Tutar</th><th>Durum</th><th>Tarih</th></tr></thead>
           <tbody>
             {rows.map((o:any)=>(
@@ -40,6 +40,23 @@ export default async function OrdersList({ searchParams }:{ searchParams:{ q?:st
             {!rows.length && <tr><td colSpan={7} className="muted">Sipariş bulunamadı.</td></tr>}
           </tbody>
         </table>
+        <div className="adm-cardlist">
+          {rows.map((o:any)=>(
+            <div className="adm-ucard" key={o.id}>
+              <div className="adm-ucard__row">
+                <Link href={`/admin/siparisler/${o.id}`} className="adm-ucard__name" style={{color:'var(--c-blue)'}}>{o.bugo_number ?? '—'}</Link>
+                <span className={`op op--${o.op_status}`}>{OP_STATUS_TR[o.op_status as keyof typeof OP_STATUS_TR]}</span>
+              </div>
+              <div style={{fontWeight:500}}>{o.company || [o.customer_first_name,o.customer_last_name].filter(Boolean).join(' ') || o.customer_email || '—'}</div>
+              <div className="adm-ucard__meta">
+                <span>{o.configurations?.collection_code ?? '—'}</span>
+                <span>{o.configurations?.quantity!=null?`${formatQty(o.configurations.quantity,'de')} Stück`:'—'}</span>
+                <span>{o.total_paid_cents!=null?formatMoney(o.total_paid_cents,o.currency||'EUR','de'):'—'}</span>
+                <span>{new Date(o.created_at).toLocaleDateString('tr-TR')}</span>
+              </div>
+            </div>))}
+          {!rows.length && <p className="muted">Sipariş bulunamadı.</p>}
+        </div>
       </div>
     </>
   );

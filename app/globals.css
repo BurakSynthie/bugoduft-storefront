@@ -452,7 +452,7 @@ body.overlay-open{overflow:hidden}
 .menu-nav{display:grid;padding:var(--s-4) var(--s-5);gap:.15rem}
 .menu-nav__item{text-align:left;background:none;border:0;border-bottom:1px solid var(--border);padding:.85rem .2rem;font:inherit;font-weight:500;cursor:pointer;color:var(--fg)}
 .menu-nav__item:hover{color:var(--accent)}
-.menu-cta{margin:var(--s-3) var(--s-5) 0}
+.menu-cta{align-self:flex-start;margin:var(--s-4) var(--s-5) 0;padding-left:1.5rem;padding-right:1.5rem}
 .menu-prefs{margin:var(--s-5) var(--s-5) 0;display:grid;gap:var(--s-3);border-top:1px solid var(--border);padding-top:var(--s-4)}
 .menu-pref{display:flex;align-items:center;justify-content:space-between;gap:var(--s-3)}
 .menu-pref__label{font-size:.82rem;color:var(--fg-muted);font-weight:600}
@@ -505,3 +505,15 @@ body.overlay-open{overflow:hidden}
 }
 /* cart drawer must sit above the mobile bottom bar / configurator action bar */
 .sfdrawer,.sfmodal{--x:0}
+
+/* Phase 6A: product card cover image + details link (fallback-safe) */
+.ccard__media{position:relative;overflow:hidden}
+.ccard__cover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.ccard__details{display:inline-flex;align-items:center;gap:.3rem;font-size:.85rem;font-weight:600;color:var(--accent);white-space:nowrap}
+.ccard__details:hover{text-decoration:underline}
+
+/* Phase 6A: product detail cover + gallery (fallback-safe) */
+.pdp__visual{position:relative;overflow:hidden}
+.pdp__cover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.pdp__gallery{display:flex;gap:.5rem;margin-top:var(--s-3);overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+.pdp__thumb{flex:0 0 22%;min-width:72px;aspect-ratio:1;object-fit:cover;border-radius:10px;scroll-snap-align:start;border:1px solid var(--border)}

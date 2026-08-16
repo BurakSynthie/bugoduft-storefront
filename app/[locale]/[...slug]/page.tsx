@@ -154,11 +154,20 @@ export default function CatchAll({ params }: { params: Params }) {
                   ))}
                 </ul>
               </div>
-              {/* sticky product visual (~45% col); becomes live configurator preview later */}
+              {/* sticky product visual (~45% col): real cover when set, else neutral fallback */}
               <div style={{ position:'sticky', top:'88px', alignSelf:'start' }}>
-                <div className="hero__visual" data-c={p.collectionCode} aria-hidden="true">
-                  <div className="hero__tag"><small>Your logo</small><b>{p.collectionCode}</b></div>
+                <div className="hero__visual pdp__visual" data-c={p.collectionCode} aria-hidden={!p.coverImage}>
+                  {p.coverImage
+                    ? <img src={p.coverImage} alt={p.coverAlt ?? p.name} className="pdp__cover" />
+                    : <div className="hero__tag"><small>Your logo</small><b>{p.collectionCode}</b></div>}
                 </div>
+                {p.gallery.length > 0 && (
+                  <div className="pdp__gallery" role="list">
+                    {p.gallery.map((src, i) => (
+                      <img key={i} src={src} alt={`${p.name} ${i + 1}`} role="listitem" loading="lazy" className="pdp__thumb" />
+                    ))}
+                  </div>
+                )}
                 <div className="chips" style={{ marginTop:'var(--s-4)' }}>
                   {scents.slice(0,6).map(s => <span key={s.code} className="chip" aria-pressed={false}>{s.name}</span>)}
                 </div>

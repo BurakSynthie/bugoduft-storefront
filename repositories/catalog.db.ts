@@ -59,6 +59,8 @@ function mapProduct(p: any): ProductView {
     options: (p.product_options ?? []).sort((a:any,b:any)=>a.sort_order-b.sort_order)
       .map((o:any)=>({ key:o.key, labelDe:o.label_de, priceDeltaCents:o.price_delta_cents })),
     scentCodes: (p.product_scents ?? []).map((r:any)=> r.scents?.code).filter(Boolean),
+    // presentation media reads are wired in a later phase; safe nulls keep types honest
+    coverImage: null, gallery: [], video: null, poster: null, coverAlt: null,
   };
 }
 

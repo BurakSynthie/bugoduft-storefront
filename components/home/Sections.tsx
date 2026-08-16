@@ -8,7 +8,9 @@ import Reveal from '@/components/ui/Reveal';
 import { IconArrow } from '@/components/ui/icons';
 import { itemPath } from '@/lib/routing';
 
-type Col = { code:string; name:string; description:string; priceFromCents:number|null; productSlug:string|null };
+type Col = { code:string; name:string; description:string; priceFromCents:number|null; productSlug:string|null; coverImage?:string|null };
+
+const DETAILS: Record<Locale,string> = { de:'Details ansehen', en:'View details', fr:'Voir les détails' };
 
 const L = {
   de: { collectionsEye:'Kollektionen', collectionsTitle:'Vier Kollektionen. Ein Ziel: Ihre Marke.',
@@ -56,7 +58,9 @@ export function Collections({ locale, dict, cols }: { locale:Locale; dict:Dict; 
           {cols.map(c => (
             <Reveal key={c.code}>
               <article className="card ccard">
-                <div className="ccard__media" data-c={c.code} />
+                <div className="ccard__media" data-c={c.code}>
+                  {c.coverImage && <img src={c.coverImage} alt={c.name} className="ccard__cover" loading="lazy" />}
+                </div>
                 <div className="ccard__body">
                   <div className="ccard__row">
                     <h3>{c.name}</h3>
@@ -67,8 +71,9 @@ export function Collections({ locale, dict, cols }: { locale:Locale; dict:Dict; 
                     {c.priceFromCents != null &&
                       <Price cents={c.priceFromCents} currency="EUR" locale={locale} from={dict.common.from} label={dict.common.perOrder} />}
                     {c.productSlug &&
-                      <Link href={itemPath('products', locale, c.productSlug)} aria-label={c.name}
-                        className="iconbtn"><IconArrow size={18} /></Link>}
+                      <Link href={itemPath('products', locale, c.productSlug)} className="ccard__details">
+                        {DETAILS[locale]} <IconArrow size={15} />
+                      </Link>}
                   </div>
                 </div>
               </article>

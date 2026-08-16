@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { requireAdmin } from '@/lib/supabase/admin-auth';
 import Logout from './Logout';
+import AdminMobileNav from './AdminMobileNav';
 
 const nav = [
   ['Genel', [['Panel','/admin']]],
@@ -14,6 +15,7 @@ export default async function AdminShellLayout({ children }: { children: ReactNo
   const admin = await requireAdmin();                 // redirects to /admin/giris if not an admin
   return (
     <div className="adm">
+      <AdminMobileNav email={admin?.email} />
       <aside className="adm__side">
         <div className="adm__brand"><span className="logo__mark" />BUGO DUFT</div>
         <nav className="adm__nav">

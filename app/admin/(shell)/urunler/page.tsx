@@ -11,7 +11,7 @@ export default function AdminProducts() {
         <button className="adm-btn adm-btn--primary">+ Yeni ürün</button>
       </div>
       <div className="adm-panel">
-        <table className="adm-table">
+        <table className="adm-table adm-hide-mobile">
           <thead><tr><th>Ürün (DE)</th><th>Kod</th><th>Koleksiyon</th><th>Başlangıç fiyatı</th><th>Durum</th><th></th></tr></thead>
           <tbody>
             {products.map(p => (
@@ -26,6 +26,23 @@ export default function AdminProducts() {
             ))}
           </tbody>
         </table>
+        <div className="adm-cardlist">
+          {products.map(p => (
+            <div className="adm-ucard" key={p.id}>
+              <div className="adm-ucard__row">
+                <span className="adm-ucard__name">{p.tr.de.name}</span>
+                {p.isActive ? <span className="adm-tag">Yayında</span> : <span className="adm-tag adm-tag--off">Pasif</span>}
+              </div>
+              <div className="adm-ucard__meta">
+                <span>{p.productCode}</span><span>{p.collectionCode}</span>
+                <span>{formatMoney(p.basePriceCents, p.currency, 'de')}</span>
+              </div>
+              <div className="adm-ucard__foot">
+                <Link className="adm-btn adm-btn--ghost" href={`/admin/urunler/${p.id}`}>Düzenle</Link>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </>
   );

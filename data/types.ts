@@ -13,12 +13,20 @@ export type CollectionSeed = {
 export type PriceTier = { minQty: number; unitPriceCents: number };
 export type ProductOption = { key: string; labelDe: string; priceDeltaCents: number };
 
+// Optional CMS presentation media. Populated from the DB in a later phase; when
+// absent the storefront uses tasteful gradient fallbacks (no fabricated assets).
+export type ProductMedia = {
+  cover?: string; gallery?: string[]; video?: string; poster?: string;
+  alt?: Partial<Tr<string>>;
+};
+
 export type ProductSeed = {
   id: string; productCode: string; collectionCode: CollectionSeed['code'];
   groupId: string; isActive: boolean;
   basePriceCents: number; currency: 'EUR';
   minQty: number; maxQty: number; qtyStep: number;
   tiers: PriceTier[]; options: ProductOption[]; scentCodes: string[];
+  media?: ProductMedia;
   tr: Tr<{ name: string; slug: string; h1: string; shortDesc: string; longDesc: string; seo: Seo }>;
 };
 

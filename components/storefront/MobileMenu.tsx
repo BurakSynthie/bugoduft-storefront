@@ -58,7 +58,7 @@ export default function MobileMenu({ locale, dict, alternates }:
           ))}
         </nav>
 
-        <button className="btn btn--primary btn--block menu-cta" onClick={() => go(configuratorPath(locale))}>
+        <button className="btn btn--primary menu-cta" onClick={() => go(configuratorPath(locale))}>
           <IconSpark size={18} /> {dict.cta.configure}
         </button>
 

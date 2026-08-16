@@ -14,6 +14,7 @@ export type ProductView = {
   basePriceCents: number; currency: 'EUR'; priceFromCents: number;
   minQty: number; maxQty: number; qtyStep: number;
   tiers: ProductSeed['tiers']; options: ProductSeed['options']; scentCodes: string[];
+  coverImage: string | null; gallery: string[]; video: string | null; poster: string | null; coverAlt: string | null;
 };
 
 function priceFrom(p: ProductSeed) { return Math.min(p.basePriceCents, ...p.tiers.map(t => t.unitPriceCents)); }
@@ -23,7 +24,9 @@ export function toProductView(p: ProductSeed, locale: Locale): ProductView {
   return { id:p.id, code:p.productCode, collectionCode:p.collectionCode, groupId:p.groupId,
     name:t.name, slug:t.slug, h1:t.h1, shortDesc:t.shortDesc, longDesc:t.longDesc, seo:t.seo,
     basePriceCents:p.basePriceCents, currency:p.currency, priceFromCents:priceFrom(p),
-    minQty:p.minQty, maxQty:p.maxQty, qtyStep:p.qtyStep, tiers:p.tiers, options:p.options, scentCodes:p.scentCodes };
+    minQty:p.minQty, maxQty:p.maxQty, qtyStep:p.qtyStep, tiers:p.tiers, options:p.options, scentCodes:p.scentCodes,
+    coverImage:p.media?.cover ?? null, gallery:p.media?.gallery ?? [], video:p.media?.video ?? null,
+    poster:p.media?.poster ?? null, coverAlt:p.media?.alt?.[locale] ?? null };
 }
 
 export function listProducts(locale: Locale): ProductView[] {
@@ -41,7 +44,8 @@ export function listCollections(locale: Locale) {
     return { code:c.code, groupId:c.groupId, name:c.tr[locale].name, slug:c.tr[locale].slug,
       description:c.tr[locale].description,
       priceFromCents: prod ? priceFrom(prod) : null,
-      productSlug: prod ? prod.tr[locale].slug : null };
+      productSlug: prod ? prod.tr[locale].slug : null,
+      coverImage: prod?.media?.cover ?? null };
   });
 }
 
