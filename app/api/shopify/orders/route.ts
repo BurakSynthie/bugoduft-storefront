@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'node:crypto';
-import { shopifyAdminEnv, isWebhookConfigured } from '@/config/shopify-admin';
+import { getWebhookSecret, isWebhookConfigured } from '@/config/shopify-admin';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 function verify(raw: string, hmacHeader: string | null): boolean {
   if (!hmacHeader) return false;
-  const digest = crypto.createHmac('sha256', shopifyAdminEnv.webhookSecret).update(raw, 'utf8').digest('base64');
+  const digest = crypto.createHmac('sha256', getWebhookSecret()).update(raw, 'utf8').digest('base64');
   try { return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(hmacHeader)); } catch { return false; }
 }
 function attr(order: any, key: string): string | null {
