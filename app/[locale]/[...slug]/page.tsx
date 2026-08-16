@@ -67,8 +67,12 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   }
   // section index
   const dict = getDict(locale);
-  const titles: Record<Section,string> = {
-    products: dict.nav.products, scents: dict.nav.scents, industries: dict.nav.industries };
+  const titles: Record<Section, string> = {
+  products: dict.nav.products,
+  scents: dict.nav.scents,
+  industries: dict.nav.industries,
+  configurator: "Konfigurator"
+};
   return buildMetadata({ locale, path: sectionPath(r.section, locale),
     title: `${titles[r.section]} | BUGO DUFT`,
     description: dict.common.minOrder + '.', alternates: sectionAlternates(r.section) });
