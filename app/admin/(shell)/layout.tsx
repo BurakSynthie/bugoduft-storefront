@@ -6,7 +6,7 @@ import AdminMobileNav from './AdminMobileNav';
 
 const nav = [
   ['Genel', [['Panel','/admin']]],
-  ['Katalog', [['Ürünler','/admin/urunler'],['Koleksiyonlar','/admin/koleksiyonlar'],['Kokular','/admin/kokular']]],
+  ['Katalog', [['Ürünler','/admin/urunler'],['Medya','/admin/medya'],['Koleksiyonlar','/admin/koleksiyonlar'],['Kokular','/admin/kokular']]],
   ['İçerik', [['Ana sayfa','/admin/ana-sayfa'],['Çeviriler','/admin/ceviriler'],['SEO','/admin/seo']]],
   ['Operasyon', [['Siparişler','/admin/siparisler'],['Teklifler','/admin/teklifler'],['Ayarlar','/admin/ayarlar']]],
 ] as const;

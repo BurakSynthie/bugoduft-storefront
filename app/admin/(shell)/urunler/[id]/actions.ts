@@ -1,6 +1,6 @@
 'use server';
-import { upsertProduct, type ProductWrite, type AdminResult } from '@/repositories/admin';
-// Server action bridge for the existing editor. Returns honest state until admin auth exists.
-export async function saveProductAction(input: ProductWrite): Promise<AdminResult<{ productCode: string }>> {
-  return upsertProduct(input);
+import { saveProduct, type ProductSaveInput, type SaveResult } from '@/repositories/admin-product';
+// Persists product content to Supabase (admin/RLS gated) and revalidates storefront routes.
+export async function saveProductAction(input: ProductSaveInput): Promise<SaveResult> {
+  return saveProduct(input);
 }

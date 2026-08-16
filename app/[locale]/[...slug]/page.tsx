@@ -17,6 +17,7 @@ import { IconArrow, IconCheck } from '@/components/ui/icons';
 import JsonLd from '@/seo/JsonLd';
 import Configurator from '@/components/configurator/Configurator';
 import { listProducts as _lp, listCollections as _lc, listScents as _ls } from '@/repositories/catalog';
+import { getProductBySlug as getProductBySlugRead, getProducts as getProductsRead, getCollections as getCollectionsRead } from '@/repositories/catalog.read';
 
 type Params = { locale: string; slug: string[] };
 
@@ -79,7 +80,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 }
 
 // -------- page --------
-export default function CatchAll({ params }: { params: Params }) {
+export default async function CatchAll({ params }: { params: Params }) {
   if (!isLocale(params.locale)) notFound();
   const locale = params.locale as Locale;
   const dict = getDict(locale);
@@ -103,7 +104,7 @@ export default function CatchAll({ params }: { params: Params }) {
   }
 
   if (r.kind === 'product') {
-    const p = getProductBySlug(locale, r!.slug); if (!p) notFound();
+    const p = await getProductBySlugRead(locale, r!.slug); if (!p) notFound();
     const scents = listScents(locale).filter(s => p.scentCodes.includes(s.code));
     const crumbs = [ crumbHome,
       { name: dict.nav.products, url: abs(sectionPath('products', locale)) },
@@ -202,8 +203,8 @@ export default function CatchAll({ params }: { params: Params }) {
 
   // ---- section index ----
   if (r.section === 'products') {
-    const products = listProducts(locale);
-    const cols = listCollections(locale);
+    const products = await getProductsRead(locale);
+    const cols = await getCollectionsRead(locale);
     return (
       <section className="section">
         <Container>

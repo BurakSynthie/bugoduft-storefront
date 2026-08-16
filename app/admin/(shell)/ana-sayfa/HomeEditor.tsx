@@ -1,0 +1,195 @@
+'use client';
+import { useState } from 'react';
+import type { Locale } from '@/i18n/config';
+import { locales } from '@/i18n/config';
+import type { HomeExtra } from '@/data/seed/home-content';
+import type { MediaRecord } from '@/lib/media/types';
+import MediaPicker from '@/components/admin/MediaPicker';
+import { saveHomepageAction } from './actions';
+
+const TABS: { id: Locale; label: string }[] = [
+  { id:'de', label:'Almanca' }, { id:'en', label:'İngilizce' }, { id:'fr', label:'Fransızca' },
+];
+type Save = 'idle' | 'saving' | 'saved' | 'error';
+type Pick =
+  | { kind:'hero' } | { kind:'prodVideo'; i:number } | { kind:'prodPoster'; i:number }
+  | { kind:'gallery' } | { kind:'logo' };
+
+type LF = {
+  shippingIncluded:string; heroChips:string[]; credibility:string[];
+  production:{ title:string; body:string }[];
+  support:{ gTitle:string; gWa:string; gDisp:string; sTitle:string; sWa:string; sDisp:string };
+  social:{ email:string; instagram:string };
+};
+
+export default function HomeEditor({ initial, configured }:{ initial: Record<Locale, HomeExtra>; configured: boolean }) {
+  const [shared, setShared] = useState({
+    heroImage: initial.de.heroProductImage,
+    prodMedia: initial.de.production.map(s => ({ video:s.video, poster:s.poster })),
+    gallery: initial.de.gallery.map(g => ({ src:g.src, alt:g.alt })),
+    logos: initial.de.referenceLogos.map(l => ({ src:l.src, alt:l.alt })),
+  });
+  const mkLF = (l: Locale): LF => ({
+    shippingIncluded: initial[l].shippingIncluded, heroChips: initial[l].heroChips, credibility: initial[l].credibility,
+    production: initial[l].production.map(s => ({ title:s.title, body:s.body })),
+    support: {
+      gTitle:initial[l].support.grafik.title, gWa:initial[l].support.grafik.whatsapp, gDisp:initial[l].support.grafik.display,
+      sTitle:initial[l].support.kundenservice.title, sWa:initial[l].support.kundenservice.whatsapp, sDisp:initial[l].support.kundenservice.display,
+    },
+    social: { email: initial[l].social.email ?? '', instagram: initial[l].social.instagram ?? '' },
+  });
+  const [byL, setByL] = useState<Record<Locale, LF>>(() =>
+    Object.fromEntries(locales.map(l => [l, mkLF(l)])) as Record<Locale, LF>);
+  const [tab, setTab] = useState<Locale>('de');
+  const [save, setSave] = useState<Save>('idle');
+  const [msg, setMsg] = useState<string | null>(null);
+  const [pick, setPick] = useState<Pick | null>(null);
+  const f = byL[tab];
+  const setF = (patch: Partial<LF>) => setByL(s => ({ ...s, [tab]: { ...s[tab], ...patch } }));
+  const lines = (v: string) => v.split('\n').map(x => x.trim()).filter(Boolean);
+
+  function onPicked(m: MediaRecord) {
+    if (!pick) return;
+    if (pick.kind === 'hero') setShared(s => ({ ...s, heroImage:m.url }));
+    else if (pick.kind === 'prodVideo') setShared(s => ({ ...s, prodMedia: s.prodMedia.map((x,i)=> i===pick.i?{...x,video:m.url}:x) }));
+    else if (pick.kind === 'prodPoster') setShared(s => ({ ...s, prodMedia: s.prodMedia.map((x,i)=> i===pick.i?{...x,poster:m.url}:x) }));
+    else if (pick.kind === 'gallery') setShared(s => ({ ...s, gallery:[...s.gallery, { src:m.url, alt:'' }] }));
+    else if (pick.kind === 'logo') setShared(s => ({ ...s, logos:[...s.logos, { src:m.url, alt:'' }] }));
+  }
+  const move = <T,>(arr:T[], i:number, d:-1|1):T[] => { const a=[...arr]; const j=i+d; if(j<0||j>=a.length)return a; [a[i],a[j]]=[a[j],a[i]]; return a; };
+
+  async function onSave() {
+    setSave('saving'); setMsg(null);
+    const content = Object.fromEntries(locales.map(l => {
+      const b = byL[l]; const base = initial[l];
+      const he: HomeExtra = {
+        ...base,
+        heroProductImage: shared.heroImage,
+        shippingIncluded: b.shippingIncluded, heroChips: b.heroChips, credibility: b.credibility,
+        production: base.production.map((s,i) => ({ ...s, title:b.production[i].title, body:b.production[i].body,
+          video: shared.prodMedia[i]?.video ?? null, poster: shared.prodMedia[i]?.poster ?? null })),
+        gallery: shared.gallery.map(g => ({ src:g.src, alt:g.alt, orientation:'portrait' as const })),
+        referenceLogos: shared.logos.map(x => ({ src:x.src, alt:x.alt })),
+        support: {
+          grafik: { ...base.support.grafik, title:b.support.gTitle, whatsapp:b.support.gWa, display:b.support.gDisp },
+          kundenservice: { ...base.support.kundenservice, title:b.support.sTitle, whatsapp:b.support.sWa, display:b.support.sDisp },
+        },
+        social: { ...base.social, email: b.social.email || undefined, instagram: b.social.instagram || undefined },
+      };
+      return [l, he];
+    })) as Record<Locale, HomeExtra>;
+    const res = await saveHomepageAction(content);
+    if (res.ok) { setSave('saved'); setTimeout(()=>setSave('idle'), 2500); }
+    else { setSave('error'); setMsg(res.message); }
+  }
+
+  return (
+    <>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'.5rem', marginBottom:'var(--s-4)', flexWrap:'wrap' }}>
+        <div className="adm-tabs" role="tablist">
+          {TABS.map(t => <button key={t.id} role="tab" aria-selected={tab===t.id} className="adm-tab" onClick={()=>setTab(t.id)}>{t.label}</button>)}
+        </div>
+        <div style={{ display:'flex', gap:'.5rem', alignItems:'center' }}>
+          {save==='saved' && <span className="adm-tag">Kaydedildi ✓</span>}
+          <button className="adm-btn adm-btn--primary" disabled={!configured || save==='saving'} onClick={onSave}>{save==='saving'?'Kaydediliyor…':'Kaydet'}</button>
+        </div>
+      </div>
+      {!configured && <div className="adm-note" style={{ marginBottom:'var(--s-4)' }}><span>ⓘ</span><span>Supabase yapılandırılmadığı için kaydetme devre dışı.</span></div>}
+      {save==='error' && msg && <div className="adm-note" style={{ marginBottom:'var(--s-4)', background:'#FEECEC', borderColor:'#F5C2C2', color:'#B42318' }}><span>⚠</span><span>{msg}</span></div>}
+
+      {/* HERO */}
+      <div className="adm-panel">
+        <strong>Hero</strong>
+        <div className="adm-grid2" style={{ marginTop:'var(--s-4)' }}>
+          <div className="field"><label>Kargo rozeti ({tab.toUpperCase()})</label><input className="input" value={f.shippingIncluded} onChange={e=>setF({shippingIncluded:e.target.value})} /></div>
+        </div>
+        <div className="field"><label>Hero çipleri — her satır bir çip ({tab.toUpperCase()})</label>
+          <textarea className="textarea" rows={4} value={f.heroChips.join('\n')} onChange={e=>setF({heroChips:lines(e.target.value)})} /></div>
+        <div className="field"><label>Güven ifadeleri — her satır bir madde ({tab.toUpperCase()})</label>
+          <textarea className="textarea" rows={2} value={f.credibility.join('\n')} onChange={e=>setF({credibility:lines(e.target.value)})} /></div>
+        <div className="field"><label>Hero ürün görseli (tüm diller)</label>
+          {shared.heroImage
+            ? <div className="media-slot"><img src={shared.heroImage} alt="" /><div className="media-slot__act"><button className="linkbtn" onClick={()=>setPick({kind:'hero'})}>Değiştir</button><button className="linkbtn" style={{color:'#B42318'}} onClick={()=>setShared(s=>({...s,heroImage:null}))}>Kaldır</button></div></div>
+            : <button className="adm-btn adm-btn--ghost" onClick={()=>setPick({kind:'hero'})}>Seç / Yükle</button>}
+        </div>
+      </div>
+
+      {/* PRODUCTION */}
+      <div className="adm-panel">
+        <strong>Üretim (4 aşama · 9:16 video)</strong>
+        <div className="adm-grid2" style={{ marginTop:'var(--s-4)' }}>
+          {f.production.map((s, i) => (
+            <div key={i} style={{ border:'1px solid var(--border)', borderRadius:12, padding:'var(--s-4)' }}>
+              <div className="adm-tag" style={{ marginBottom:'.5rem' }}>{initial.de.production[i].n}</div>
+              <div className="field"><label>Başlık ({tab.toUpperCase()})</label><input className="input" value={s.title} onChange={e=>setF({production:f.production.map((x,j)=>j===i?{...x,title:e.target.value}:x)})} /></div>
+              <div className="field"><label>Açıklama ({tab.toUpperCase()})</label><textarea className="textarea" rows={2} value={s.body} onChange={e=>setF({production:f.production.map((x,j)=>j===i?{...x,body:e.target.value}:x)})} /></div>
+              <div style={{ display:'flex', gap:'.4rem', flexWrap:'wrap' }}>
+                <button className="linkbtn" onClick={()=>setPick({kind:'prodVideo',i})}>{shared.prodMedia[i]?.video?'Video ✓':'Video seç'}</button>
+                <button className="linkbtn" onClick={()=>setPick({kind:'prodPoster',i})}>{shared.prodMedia[i]?.poster?'Poster ✓':'Poster seç'}</button>
+                {shared.prodMedia[i]?.video && <button className="linkbtn" style={{color:'#B42318'}} onClick={()=>setShared(st=>({...st,prodMedia:st.prodMedia.map((x,j)=>j===i?{...x,video:null}:x)}))}>Video kaldır</button>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* GALLERY */}
+      <MediaList title="Üretim galerisi" items={shared.gallery} onAdd={()=>setPick({kind:'gallery'})}
+        onAlt={(i,v)=>setShared(s=>({...s,gallery:s.gallery.map((x,j)=>j===i?{...x,alt:v}:x)}))}
+        onMove={(i,d)=>setShared(s=>({...s,gallery:move(s.gallery,i,d)}))}
+        onRemove={i=>setShared(s=>({...s,gallery:s.gallery.filter((_,j)=>j!==i)}))} altLabel="Alt metin" />
+
+      {/* REFERENCES */}
+      <MediaList title="Referans logoları" items={shared.logos} onAdd={()=>setPick({kind:'logo'})}
+        onAlt={(i,v)=>setShared(s=>({...s,logos:s.logos.map((x,j)=>j===i?{...x,alt:v}:x)}))}
+        onMove={(i,d)=>setShared(s=>({...s,logos:move(s.logos,i,d)}))}
+        onRemove={i=>setShared(s=>({...s,logos:s.logos.filter((_,j)=>j!==i)}))} altLabel="Firma adı" />
+
+      {/* SUPPORT */}
+      <div className="adm-panel">
+        <strong>Destek & iletişim ({tab.toUpperCase()})</strong>
+        <div className="adm-grid2" style={{ marginTop:'var(--s-4)' }}>
+          <div className="field"><label>Grafik — başlık</label><input className="input" value={f.support.gTitle} onChange={e=>setF({support:{...f.support,gTitle:e.target.value}})} /></div>
+          <div className="field"><label>Grafik — WhatsApp</label><input className="input" value={f.support.gWa} onChange={e=>setF({support:{...f.support,gWa:e.target.value}})} /></div>
+          <div className="field"><label>Grafik — görünen numara</label><input className="input" value={f.support.gDisp} onChange={e=>setF({support:{...f.support,gDisp:e.target.value}})} /></div>
+          <div className="field"><label>Servis — başlık</label><input className="input" value={f.support.sTitle} onChange={e=>setF({support:{...f.support,sTitle:e.target.value}})} /></div>
+          <div className="field"><label>Servis — WhatsApp</label><input className="input" value={f.support.sWa} onChange={e=>setF({support:{...f.support,sWa:e.target.value}})} /></div>
+          <div className="field"><label>Servis — görünen numara</label><input className="input" value={f.support.sDisp} onChange={e=>setF({support:{...f.support,sDisp:e.target.value}})} /></div>
+          <div className="field"><label>E-posta</label><input className="input" value={f.social.email} onChange={e=>setF({social:{...f.social,email:e.target.value}})} /></div>
+          <div className="field"><label>Instagram URL</label><input className="input" value={f.social.instagram} onChange={e=>setF({social:{...f.social,instagram:e.target.value}})} /></div>
+        </div>
+        <p className="muted" style={{ fontSize:'.82rem' }}>Boş sosyal URL storefront’ta bağlantı olarak render edilmez.</p>
+      </div>
+
+      {pick && <MediaPicker type={pick.kind==='prodVideo'?'video':'image'} onSelect={onPicked} onClose={()=>setPick(null)} />}
+    </>
+  );
+}
+
+function MediaList({ title, items, onAdd, onAlt, onMove, onRemove, altLabel }:{
+  title:string; items:{src:string;alt:string}[]; onAdd:()=>void; onAlt:(i:number,v:string)=>void;
+  onMove:(i:number,d:-1|1)=>void; onRemove:(i:number)=>void; altLabel:string }) {
+  return (
+    <div className="adm-panel">
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <strong>{title} <span className="muted" style={{ fontWeight:400 }}>(tüm diller)</span></strong>
+        <button className="adm-btn adm-btn--ghost" onClick={onAdd}>+ Ekle</button>
+      </div>
+      {items.length===0 ? <p className="muted" style={{ fontSize:'.85rem', marginTop:'.5rem' }}>Boş — eklenmezse storefront’ta zarif boş durum korunur.</p> :
+        <div className="media-grid" style={{ marginTop:'var(--s-3)' }}>
+          {items.map((it,i) => (
+            <div className="media-card" key={it.src+i}>
+              <div className="media-card__thumb"><img src={it.src} alt="" /></div>
+              <div style={{ padding:'.4rem .5rem', display:'grid', gap:'.35rem' }}>
+                <input className="input" style={{ fontSize:'.78rem' }} placeholder={altLabel} value={it.alt} onChange={e=>onAlt(i,e.target.value)} />
+                <div style={{ display:'flex', justifyContent:'space-between' }}>
+                  <span style={{ display:'flex', gap:'.25rem' }}><button className="linkbtn" onClick={()=>onMove(i,-1)}>↑</button><button className="linkbtn" onClick={()=>onMove(i,1)}>↓</button></span>
+                  <button className="linkbtn" style={{ color:'#B42318' }} onClick={()=>onRemove(i)}>Kaldır</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>}
+    </div>
+  );
+}

@@ -2,8 +2,9 @@ import type { Metadata } from 'next';
 import { isLocale, type Locale } from '@/i18n/config';
 import { getDict } from '@/i18n';
 import { getHome } from '@/data/seed/homepage';
-import { getHomeContent } from '@/data/seed/home-content';
+import { getHomeExtra } from '@/repositories/homepage';
 import { listCollections, listScents, listIndustries, homeAlternates } from '@/repositories/catalog';
+import { getCollections } from '@/repositories/catalog.read';
 import { buildMetadata, organizationLd, faqLd } from '@/lib/seo';
 import JsonLd from '@/seo/JsonLd';
 import Hero from '@/components/home/Hero';
@@ -31,14 +32,14 @@ export async function generateMetadata({ params }: { params:{ locale:string } })
   return buildMetadata({ locale, path:`/${locale}`, title, description: heroDesc[locale], alternates: homeAlternates() });
 }
 
-export default function HomePage({ params }: { params:{ locale:string } }) {
+export default async function HomePage({ params }: { params:{ locale:string } }) {
   const locale = (isLocale(params.locale)?params.locale:'de') as Locale;
   const dict = getDict(locale);
   const content = getHome(locale);
-  const cols = listCollections(locale);
+  const cols = await getCollections(locale);
   const scents = listScents(locale);
   const industries = listIndustries(locale);
-  const hc = getHomeContent(locale);
+  const hc = await getHomeExtra(locale);
   const faqItems = hc.faqGroups.flatMap(g => g.items);
   return (
     <>
