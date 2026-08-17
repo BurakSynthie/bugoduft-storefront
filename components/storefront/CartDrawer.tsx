@@ -95,6 +95,7 @@ export default function CartDrawer({ locale }: { locale: Locale }) {
                   </div>
                   <dl className="cart-item__meta">
                     <div><dt>{sfScent(locale)}</dt><dd>{item.scentName ?? '—'}</dd></div>
+                    {item.scentName2 && <div><dt>{sfScent(locale)} 2</dt><dd>{item.scentName2} ({locale==='de'?'kostenlos':locale==='fr'?'gratuit':'free'})</dd></div>}
                     <div><dt>{sfIntensity(locale)}</dt><dd>{item.intensity === 'intense' ? t.intense : t.normal}</dd></div>
                     <div><dt>{sfShape(locale)}</dt><dd>{item.shapeLabel}</dd></div>
                     <div><dt>{t.front}</dt><dd className="ellip">{item.frontName ?? '—'}</dd></div>

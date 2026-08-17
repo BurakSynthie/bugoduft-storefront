@@ -12,10 +12,11 @@ const TABS: { id: Locale; label: string }[] = [
 ];
 type Save = 'idle' | 'saving' | 'saved' | 'error';
 type Pick =
-  | { kind:'hero' } | { kind:'prodVideo'; i:number } | { kind:'prodPoster'; i:number }
+  | { kind:'hero' } | { kind:'heroVideo' } | { kind:'heroPoster' } | { kind:'prodVideo'; i:number } | { kind:'prodPoster'; i:number }
   | { kind:'gallery' } | { kind:'logo' };
 
 type LF = {
+  heroEyebrow:string; heroHead:string; heroSub:string;
   shippingIncluded:string; heroChips:string[]; credibility:string[];
   production:{ title:string; body:string }[];
   support:{ gTitle:string; gWa:string; gDisp:string; sTitle:string; sWa:string; sDisp:string };
@@ -25,11 +26,14 @@ type LF = {
 export default function HomeEditor({ initial, configured }:{ initial: Record<Locale, HomeExtra>; configured: boolean }) {
   const [shared, setShared] = useState({
     heroImage: initial.de.heroProductImage,
+    heroVideo: initial.de.heroVideo ?? null,
+    heroPoster: initial.de.heroPoster ?? null,
     prodMedia: initial.de.production.map(s => ({ video:s.video, poster:s.poster })),
     gallery: initial.de.gallery.map(g => ({ src:g.src, alt:g.alt })),
     logos: initial.de.referenceLogos.map(l => ({ src:l.src, alt:l.alt })),
   });
   const mkLF = (l: Locale): LF => ({
+    heroEyebrow: initial[l].heroEyebrow ?? '', heroHead: initial[l].heroHead ?? '', heroSub: initial[l].heroSub ?? '',
     shippingIncluded: initial[l].shippingIncluded, heroChips: initial[l].heroChips, credibility: initial[l].credibility,
     production: initial[l].production.map(s => ({ title:s.title, body:s.body })),
     support: {
@@ -51,6 +55,8 @@ export default function HomeEditor({ initial, configured }:{ initial: Record<Loc
   function onPicked(m: MediaRecord) {
     if (!pick) return;
     if (pick.kind === 'hero') setShared(s => ({ ...s, heroImage:m.url }));
+    else if (pick.kind === 'heroVideo') setShared(s => ({ ...s, heroVideo:m.url }));
+    else if (pick.kind === 'heroPoster') setShared(s => ({ ...s, heroPoster:m.url }));
     else if (pick.kind === 'prodVideo') setShared(s => ({ ...s, prodMedia: s.prodMedia.map((x,i)=> i===pick.i?{...x,video:m.url}:x) }));
     else if (pick.kind === 'prodPoster') setShared(s => ({ ...s, prodMedia: s.prodMedia.map((x,i)=> i===pick.i?{...x,poster:m.url}:x) }));
     else if (pick.kind === 'gallery') setShared(s => ({ ...s, gallery:[...s.gallery, { src:m.url, alt:'' }] }));
@@ -65,6 +71,8 @@ export default function HomeEditor({ initial, configured }:{ initial: Record<Loc
       const he: HomeExtra = {
         ...base,
         heroProductImage: shared.heroImage,
+        heroEyebrow: b.heroEyebrow || undefined, heroHead: b.heroHead || undefined, heroSub: b.heroSub || undefined,
+        heroVideo: shared.heroVideo, heroPoster: shared.heroPoster,
         shippingIncluded: b.shippingIncluded, heroChips: b.heroChips, credibility: b.credibility,
         production: base.production.map((s,i) => ({ ...s, title:b.production[i].title, body:b.production[i].body,
           video: shared.prodMedia[i]?.video ?? null, poster: shared.prodMedia[i]?.poster ?? null })),
@@ -100,18 +108,34 @@ export default function HomeEditor({ initial, configured }:{ initial: Record<Loc
       {/* HERO */}
       <div className="adm-panel">
         <strong>Hero</strong>
-        <div className="adm-grid2" style={{ marginTop:'var(--s-4)' }}>
+        <div className="field"><label>Eyebrow ({tab.toUpperCase()})</label><input className="input" value={f.heroEyebrow} onChange={e=>setF({heroEyebrow:e.target.value})} placeholder="INDIVIDUELLE WERBEDÜFTE · MADE FOR YOUR BRAND" /></div>
+        <div className="field"><label>Başlık / H1 ({tab.toUpperCase()})</label><input className="input" value={f.heroHead} onChange={e=>setF({heroHead:e.target.value})} placeholder="Individuelle Duftanhänger für Ihre Marke." /></div>
+        <div className="field"><label>Alt başlık ({tab.toUpperCase()})</label><textarea className="textarea" rows={2} value={f.heroSub} onChange={e=>setF({heroSub:e.target.value})} /></div>
+        <div className="adm-grid2" style={{ marginTop:'var(--s-2)' }}>
           <div className="field"><label>Kargo rozeti ({tab.toUpperCase()})</label><input className="input" value={f.shippingIncluded} onChange={e=>setF({shippingIncluded:e.target.value})} /></div>
         </div>
         <div className="field"><label>Hero çipleri — her satır bir çip ({tab.toUpperCase()})</label>
           <textarea className="textarea" rows={4} value={f.heroChips.join('\n')} onChange={e=>setF({heroChips:lines(e.target.value)})} /></div>
         <div className="field"><label>Güven ifadeleri — her satır bir madde ({tab.toUpperCase()})</label>
           <textarea className="textarea" rows={2} value={f.credibility.join('\n')} onChange={e=>setF({credibility:lines(e.target.value)})} /></div>
-        <div className="field"><label>Hero ürün görseli (tüm diller)</label>
+        <div className="field"><label>Hero ürün görseli (görsel VEYA video)</label>
           {shared.heroImage
             ? <div className="media-slot"><img src={shared.heroImage} alt="" /><div className="media-slot__act"><button className="linkbtn" onClick={()=>setPick({kind:'hero'})}>Değiştir</button><button className="linkbtn" style={{color:'#B42318'}} onClick={()=>setShared(s=>({...s,heroImage:null}))}>Kaldır</button></div></div>
-            : <button className="adm-btn adm-btn--ghost" onClick={()=>setPick({kind:'hero'})}>Seç / Yükle</button>}
+            : <button className="adm-btn adm-btn--ghost" onClick={()=>setPick({kind:'hero'})}>Görsel seç / Yükle</button>}
         </div>
+        <div className="adm-grid2">
+          <div className="field"><label>Hero videosu (ops. · sessiz döngü)</label>
+            {shared.heroVideo
+              ? <div className="media-slot"><video src={shared.heroVideo} muted preload="none" /><div className="media-slot__act"><button className="linkbtn" onClick={()=>setPick({kind:'heroVideo'})}>Değiştir</button><button className="linkbtn" style={{color:'#B42318'}} onClick={()=>setShared(s=>({...s,heroVideo:null}))}>Kaldır</button></div></div>
+              : <button className="adm-btn adm-btn--ghost" onClick={()=>setPick({kind:'heroVideo'})}>Video seç / Yükle</button>}
+          </div>
+          <div className="field"><label>Video posteri (ops.)</label>
+            {shared.heroPoster
+              ? <div className="media-slot"><img src={shared.heroPoster} alt="" /><div className="media-slot__act"><button className="linkbtn" onClick={()=>setPick({kind:'heroPoster'})}>Değiştir</button><button className="linkbtn" style={{color:'#B42318'}} onClick={()=>setShared(s=>({...s,heroPoster:null}))}>Kaldır</button></div></div>
+              : <button className="adm-btn adm-btn--ghost" onClick={()=>setPick({kind:'heroPoster'})}>Poster seç / Yükle</button>}
+          </div>
+        </div>
+        <p className="muted" style={{ fontSize:'.8rem' }}>Video verildiğinde görsel yerine sessiz otomatik döngü olarak gösterilir (kontrol yok).</p>
       </div>
 
       {/* PRODUCTION */}
@@ -161,7 +185,7 @@ export default function HomeEditor({ initial, configured }:{ initial: Record<Loc
         <p className="muted" style={{ fontSize:'.82rem' }}>Boş sosyal URL storefront’ta bağlantı olarak render edilmez.</p>
       </div>
 
-      {pick && <MediaPicker type={pick.kind==='prodVideo'?'video':'image'} onSelect={onPicked} onClose={()=>setPick(null)} />}
+      {pick && <MediaPicker type={(pick.kind==='prodVideo'||pick.kind==='heroVideo')?'video':'image'} onSelect={onPicked} onClose={()=>setPick(null)} />}
     </>
   );
 }

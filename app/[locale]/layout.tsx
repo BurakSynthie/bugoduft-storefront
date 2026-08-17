@@ -13,6 +13,7 @@ import MobileNav from '@/components/layout/MobileNav';
 import CookieBar from '@/components/layout/CookieBar';
 import AnnouncementBar from '@/components/layout/AnnouncementBar';
 import { getHome } from '@/data/seed/homepage';
+import { getSettings } from '@/repositories/settings';
 import { StorefrontProvider } from '@/lib/cart/store';
 import Overlays from '@/components/storefront/Overlays';
 
@@ -20,21 +21,32 @@ export function generateStaticParams() { return locales.map(locale => ({ locale 
 
 export async function generateMetadata({ params }: { params: { locale: string } }): Promise<Metadata> {
   const locale = (isLocale(params.locale) ? params.locale : 'de') as Locale;
+  const settings = await getSettings();
+  const og = settings.defaultOgImage || site.defaultOgImage;
   return {
     metadataBase: new URL(site.url),
     title: { default: 'BUGO DUFT', template: '%s | BUGO DUFT' },
-    applicationName: site.name,
+    applicationName: settings.brandName || site.name,
     icons: { icon: '/favicon.svg' },
-    openGraph: { siteName: site.name, locale: htmlLang[locale] },
+    openGraph: { siteName: settings.brandName || site.name, locale: htmlLang[locale],
+      images: og ? [{ url: og.startsWith('http') ? og : `${site.url}${og}` }] : undefined },
   };
 }
 
-export default function LocaleLayout({ children, params }:
+export default async function LocaleLayout({ children, params }:
   { children: ReactNode; params: { locale: string } }) {
   if (!isLocale(params.locale)) notFound();
   const locale = params.locale as Locale;
   const dict = getDict(locale);
   const home = getHome(locale);
+  const settings = await getSettings();
+  const ann = settings.announcement;
+  // DB-first: show the admin text when the bar is enabled and set; otherwise keep
+  // the shipped seed announcement so nothing regresses before an admin configures it.
+  const annEnabled = ann.enabled && !!ann.text[locale];
+  const annText = annEnabled ? ann.text[locale] : home.announcement;
+  const annHref = annEnabled ? (ann.href || undefined) : undefined;
+  const annLabel = annEnabled ? (ann.linkLabel[locale] || undefined) : undefined;
   const nav = [
     { label: dict.nav.products, href: sectionPath('products', locale) },
     { label: dict.nav.scents, href: sectionPath('scents', locale) },
@@ -53,10 +65,10 @@ export default function LocaleLayout({ children, params }:
       </head>
       <body>
         <StorefrontProvider>
-          <AnnouncementBar text={home.announcement} />
+          <AnnouncementBar text={annText} href={annHref} linkLabel={annLabel} />
           <Header locale={locale} dict={dict} nav={nav} alternates={homeAlternates()} />
           <main className="pb-mobnav">{children}</main>
-          <Footer locale={locale} dict={dict} />
+          <Footer locale={locale} dict={dict} settings={settings} />
           <MobileNav locale={locale} dict={dict} />
           <CookieBar dict={dict} />
           <Overlays locale={locale} dict={dict} alternates={homeAlternates()} />

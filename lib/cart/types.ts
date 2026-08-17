@@ -14,6 +14,8 @@ export type CartItem = {
   quantity: number;
   scentCode: string | null;
   scentName: string | null;
+  scentCode2: string | null;
+  scentName2: string | null;
   intensity: Intensity;
   shape: ShapeId;
   shapeLabel: string;

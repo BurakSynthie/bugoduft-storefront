@@ -17,7 +17,7 @@ export type BeginResult =
 export async function beginCheckout(
   cfg: IncomingConfig, fileFields: { field: string; name: string }[],
 ): Promise<BeginResult> {
-  const priced = validateAndPrice(cfg);
+  const priced = await validateAndPrice(cfg);
   if (!priced.ok) { console.error('[checkout] begin invalid:', priced.error); return { ok:false, code:'invalid', message: ERR_PREP }; }
   if (!isSupabaseConfigured()) return { ok:false, code:'unconfigured',
     message:'Der Checkout ist noch nicht konfiguriert (Supabase fehlt).' };
@@ -38,7 +38,7 @@ export async function finalizeCheckout(
   cfg: IncomingConfig,
   paths: { frontPath?: string|null; backPath?: string|null; supporting?: { field:string; path:string }[] },
 ): Promise<FinalizeResult> {
-  const priced = validateAndPrice(cfg);                          // recompute — never trust client
+  const priced = await validateAndPrice(cfg);                          // recompute — never trust client
   if (!priced.ok) { console.error('[checkout] finalize invalid:', priced.error); return { ok:false, code:'invalid', message: ERR_PREP }; }
   if (!isShopifyConfigured()) return { ok:false, code:'unconfigured',
     message:'Der Shopify-Checkout ist noch nicht konfiguriert.' };
@@ -50,10 +50,16 @@ export async function finalizeCheckout(
     { key:'Kollektion', value: cfg.collectionCode },
     { key:'Menge', value: `${formatQty(cfg.quantity, cfg.locale)}` },
     { key:'Duft', value: cfg.scentCode ?? '-' },
+    ...(cfg.scentCode2 ? [{ key:'Duft 2 (kostenlos)', value: cfg.scentCode2 }] : []),
     { key:'Intensität', value: cfg.intensity === 'intense' ? 'Intensivduft' : 'Normalduft' },
     { key:'Form', value: cfg.shape },
     { key:'Vorderseite', value: paths.frontPath ? 'hochgeladen' : '-' },
     { key:'Rückseite', value: cfg.sameBackAsFront ? 'identisch' : (paths.backPath ? 'hochgeladen' : '-') },
+    { key:'Designmodus', value: (cfg.designMode === 'ready_file' ? 'Fertige Druckdatei' : 'BUGO erstellt Design') },
+    { key:'Stückpreis/1.000', value: `${(priced.unitRateCents/100).toFixed(2)} €` },
+    { key:'Gesamtpreis (BUGO)', value: `${(priced.totalPriceCents/100).toFixed(2)} €` },
+    ...(priced.savingsCents > 0 ? [{ key:'Mengenersparnis', value: `${(priced.savingsCents/100).toFixed(2)} €` }] : []),
+    ...(priced.freeSampleSet ? [{ key:'40-Düfte Musterset', value: 'kostenlos inklusive' }] : []),
   ];
   const cart = await createConfiguredCart({
     collectionCode: cfg.collectionCode, quantity: cfg.quantity,

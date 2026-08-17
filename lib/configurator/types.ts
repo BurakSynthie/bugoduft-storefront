@@ -16,6 +16,8 @@ export type BugoConfiguration = {
   productId: string; collectionCode: string;
   quantity: number;
   scentCode: string | null;
+  scentCode2: string | null;
+  designMode: 'bugo_creates' | 'ready_file';
   intensity: Intensity;
   shape: ShapeId;
   frontArtwork: ArtworkRef | null;

@@ -48,7 +48,7 @@ export async function persistItemFiles(item: CartItem): Promise<PersistResult> {
 function incomingOf(item: CartItem): IncomingConfig {
   return {
     configId: item.configId, locale: item.locale, collectionCode: item.collectionCode,
-    scentCode: item.scentCode, intensity: item.intensity, shape: item.shape, quantity: item.quantity,
+    scentCode: item.scentCode, scentCode2: item.scentCode2, intensity: item.intensity, shape: item.shape, quantity: item.quantity,
     frontInstructions: item.frontInstructions, sameBackAsFront: item.sameBackAsFront,
     backInstructions: item.sameBackAsFront ? '' : item.backInstructions,
   };

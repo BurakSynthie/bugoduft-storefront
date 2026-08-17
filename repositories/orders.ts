@@ -51,8 +51,12 @@ async function audit(orderId:string, field:string, oldV:any, newV:any) {
     field, old_value: oldV==null?null:String(oldV), new_value: newV==null?null:String(newV) });
 }
 
-export async function updateOpStatus(id:string, status:OpStatus) {
+export async function updateOpStatus(id:string, status:OpStatus, force=false) {
   const cur = await getOrder(id); if (!cur) return { ok:false as const };
+  // Guard: don't move into production while the customer's design approval isn't recorded.
+  if (status === 'production' && !force && (cur as any).approval_state !== 'approved') {
+    return { ok:false as const, warn:true as const, message:'Müşteri tasarım onayı henüz kaydedilmedi.' };
+  }
   const { error } = await admin().from('orders').update({ op_status: status }).eq('id', id);
   if (error) return { ok:false as const, message:error.message };
   await audit(id, 'op_status', cur.op_status, status);
@@ -61,7 +65,7 @@ export async function updateOpStatus(id:string, status:OpStatus) {
 export async function approveDesign(id:string) {
   const cur = await getOrder(id); if (!cur) return { ok:false as const };
   const now = new Date().toISOString();
-  const { error } = await admin().from('orders').update({ design_approved_at: now, op_status:'production' }).eq('id', id);
+  const { error } = await admin().from('orders').update({ design_approved_at: now, approval_state:'approved', op_status:'production' }).eq('id', id);
   if (error) return { ok:false as const, message:error.message };
   await audit(id, 'design_approved_at', cur.design_approved_at, now);
   await audit(id, 'op_status', cur.op_status, 'production');

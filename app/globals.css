@@ -517,3 +517,123 @@ body.overlay-open{overflow:hidden}
 .pdp__cover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
 .pdp__gallery{display:flex;gap:.5rem;margin-top:var(--s-3);overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
 .pdp__thumb{flex:0 0 22%;min-width:72px;aspect-ratio:1;object-fit:cover;border-radius:10px;scroll-snap-align:start;border:1px solid var(--border)}
+
+/* Phase 6C: promo compare price + product detail info blocks */
+.price-compare{color:var(--fg-muted);text-decoration:line-through;font-size:.95rem;opacity:.8}
+.pdp__info{margin-top:var(--s-8);display:grid;gap:var(--s-6);max-width:820px}
+.pdp__block h2{font-size:1.1rem;margin-bottom:var(--s-3)}
+.pdp__features{list-style:none;padding:0;display:grid;gap:.5rem}
+.pdp__features li{display:flex;gap:.5rem;align-items:flex-start;color:var(--fg-muted);font-size:.95rem}
+
+/* Phase 6C: optional free second scent */
+.cfg-second{margin-top:var(--s-4)}
+.cfg-second__add{display:flex;flex-direction:column;gap:.15rem;width:100%;padding:.7rem 1rem;border:1.5px dashed var(--accent);
+  border-radius:12px;background:color-mix(in srgb,var(--accent) 5%,transparent);color:var(--accent);font-weight:600;cursor:pointer;text-align:left}
+.cfg-second__add:disabled{opacity:.45;cursor:not-allowed;border-color:var(--border);color:var(--fg-muted)}
+.cfg-second__free{font-size:.78rem;font-weight:500;color:var(--fg-muted)}
+.cfg-second__panel{margin-top:var(--s-3);padding:var(--s-4);border:1px solid var(--border);border-radius:12px;background:var(--bg-subtle)}
+.cfg-second__head{display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem}
+.cfg-second__tag{color:#1a7f37;font-weight:700}
+
+/* Phase 6D: consistent, whole-card-clickable product cards */
+.ccard--click{position:relative;transition:border-color .18s ease, box-shadow .18s ease, transform .18s ease}
+.ccard--click:hover{border-color:var(--accent);box-shadow:0 10px 30px -12px rgba(18,104,232,.28);transform:translateY(-2px)}
+.ccard--click:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(18,104,232,.18)}
+.ccard__stretch::after{content:"";position:absolute;inset:0;z-index:1;border-radius:inherit}
+.ccard--click .ccard__details{position:static}
+.ccard--click a:not(.ccard__stretch),.ccard--click button{position:relative;z-index:2}
+/* announcement link */
+.ann__link{margin-left:.6rem;text-decoration:underline;font-weight:600}
+
+/* Phase 6D: mobile quick language switcher */
+.only-mobile{display:none}
+@media(max-width:880px){ .only-mobile{display:inline-flex} }
+.qlang{position:relative}
+.qlang__btn{display:inline-flex;align-items:center;gap:.2rem;font-weight:700;font-size:.8rem;padding:.4rem .55rem;
+  border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--fg);cursor:pointer;font-family:inherit}
+.qlang__pop{position:absolute;top:calc(100% + 6px);right:0;z-index:60;background:#fff;border:1px solid var(--border);
+  border-radius:12px;box-shadow:0 12px 34px -12px rgba(16,18,22,.28);padding:.3rem;min-width:150px;display:grid;gap:.1rem}
+.qlang__pop button{display:flex;align-items:center;gap:.5rem;width:100%;text-align:left;padding:.55rem .6rem;border:0;
+  background:none;border-radius:8px;cursor:pointer;font-family:inherit;font-size:.9rem;color:var(--fg)}
+.qlang__pop button:hover{background:var(--c-gray)}
+.qlang__pop button.is-current{color:var(--accent)}
+.qlang__pop button span{color:var(--fg-muted);font-size:.82rem}
+
+/* Phase 6D: hero video media — responsive, no giant fixed mobile box */
+.hero__media{display:block;width:100%;border-radius:var(--r-lg,20px);overflow:hidden;background:#0b1220}
+.hero__media video{width:100%;height:100%;object-fit:cover;display:block;aspect-ratio:4/5}
+@media(max-width:880px){ .hero__media video{aspect-ratio:16/10;max-height:60vh} }
+
+/* Phase 6D (cont.): compact 3-step order strip */
+.ordersteps{padding:var(--s-6) 0;border-bottom:1px solid var(--border)}
+.ordersteps__eye{font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.ordersteps__row{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s-4)}
+.ordersteps__item{display:flex;align-items:center;gap:.6rem;font-weight:600}
+.ordersteps__n{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--c-gray);color:var(--accent);font-size:.82rem;font-weight:700;flex:none}
+.ordersteps__note{margin:.7rem 0 0;color:var(--fg-muted);font-size:.85rem}
+@media(max-width:720px){.ordersteps__row{grid-template-columns:1fr;gap:.6rem}}
+
+/* Phase 6E-A: customer account */
+.authwrap{max-width:440px;margin:0 auto}
+.authbox{background:#fff;border:1px solid var(--border);border-radius:var(--r-lg,18px);padding:var(--s-6)}
+.authbox h1{font-size:1.4rem;margin-bottom:var(--s-4)}
+.authbox__err{color:#B42318;font-size:.85rem;margin:.2rem 0 .6rem}
+.authbox__links{display:flex;flex-direction:column;gap:.4rem;margin-top:var(--s-4);font-size:.88rem}
+.authbox__links a{color:var(--accent);font-weight:600}
+.acct{display:grid;grid-template-columns:230px 1fr;gap:var(--s-6);align-items:start}
+.acct__nav{background:#fff;border:1px solid var(--border);border-radius:16px;padding:var(--s-4);position:sticky;top:90px}
+.acct__who{font-size:.8rem;color:var(--fg-muted);margin-bottom:var(--s-3);overflow-wrap:anywhere}
+.acct__nav nav{display:flex;flex-direction:column;gap:.2rem}
+.acct__nav a{padding:.55rem .6rem;border-radius:9px;font-weight:600;font-size:.92rem}
+.acct__nav a[aria-current="page"]{background:var(--c-gray);color:var(--accent)}
+.acct__logout{margin-top:.4rem;text-align:left;background:none;border:0;color:#B42318;font-weight:600;cursor:pointer;padding:.55rem .6rem;font-family:inherit}
+.acct-note,.acct-approval{background:#F4F8FF;border:1px solid #D6E4FF;border-radius:12px;padding:var(--s-4);margin:var(--s-4) 0}
+.acct-approval--approved{background:#EFFaf1;border-color:#BDECC7}
+.acct-approval--revision{background:#FFF7E6;border-color:#F5D9A8}
+.acct-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:var(--s-4)}
+.acct-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:var(--s-4);display:flex;flex-direction:column;gap:.3rem}
+.acct-card b{font-size:.95rem}.acct-card span{font-size:1.6rem;font-weight:700;color:var(--accent)}
+.acct-orders{display:grid;gap:var(--s-3)}
+.acct-order{background:#fff;border:1px solid var(--border);border-radius:14px;padding:var(--s-4);display:flex;flex-direction:column;gap:.4rem;transition:border-color .15s}
+.acct-order:hover{border-color:var(--accent)}
+.acct-order__top{display:flex;justify-content:space-between;align-items:center}
+.acct-order__meta{display:flex;justify-content:space-between;color:var(--fg-muted);font-size:.88rem}
+.acct-timeline{list-style:none;padding:0;margin:var(--s-4) 0;display:flex;gap:0;flex-wrap:wrap}
+.acct-timeline li{flex:1;min-width:120px;position:relative;padding:0 .3rem;color:var(--fg-muted);font-size:.82rem;font-weight:600;display:flex;flex-direction:column;gap:.4rem;align-items:flex-start}
+.acct-timeline__dot{width:14px;height:14px;border-radius:50%;background:var(--border);display:block}
+.acct-timeline li.is-done{color:var(--accent)}
+.acct-timeline li.is-done .acct-timeline__dot{background:var(--accent)}
+.acct-block{background:#fff;border:1px solid var(--border);border-radius:14px;padding:var(--s-4);margin:var(--s-4) 0;display:flex;flex-direction:column;gap:.6rem;align-items:flex-start}
+.acct-dl{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;width:100%}
+.acct-dl dt{font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--fg-muted)}
+.acct-dl dd{margin:0;font-weight:600}
+@media(max-width:820px){.acct{grid-template-columns:1fr}.acct__nav{position:static}}
+
+/* Phase 6E-A: design-included section */
+.designinc__card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:var(--s-5)}
+.designinc__n{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:10px;background:color-mix(in srgb,var(--accent) 12%,#fff);color:var(--accent);margin-bottom:.6rem}
+.designinc__card h3{font-size:1rem;margin-bottom:.35rem}
+
+/* Phase 6E-B1 hotfixes: real hero video (no grid overlay, fills container, mobile-safe) */
+.hero__visual--media{background:transparent;overflow:hidden}
+.hero__visual--media::before{display:none !important;content:none !important}
+.hero__visual--media .hero__media{position:absolute;inset:0;height:100%;border-radius:inherit}
+.hero__visual--media .hero__media video{width:100%;height:100%;object-fit:cover;aspect-ratio:auto;max-height:none}
+@media(max-width:880px){ .hero__visual--media{aspect-ratio:4/3} }
+/* announcement bar: true edge-to-edge on mobile */
+.ann{width:100%;box-sizing:border-box}
+@media(max-width:640px){ .ann{padding-left:12px;padding-right:12px;font-size:.78rem} }
+
+/* Phase 6E-B1: configurator tier price panel */
+.tierbox{margin-top:.9rem;max-width:320px;background:var(--bg-subtle,#f7f8fa);border:1px solid var(--border);border-radius:12px;padding:.75rem .9rem;display:grid;gap:.35rem}
+.tierbox__row{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;font-size:.9rem}
+.tierbox__total{border-top:1px dashed var(--border);padding-top:.35rem;font-size:1.02rem}
+.tierbox__save{color:#1a7f37;font-weight:600;font-size:.85rem}
+.tierbox__sample{margin-top:.2rem;background:#EFFaf1;border:1px solid #BDECC7;border-radius:9px;padding:.4rem .55rem;font-size:.82rem;font-weight:600;color:#166534}
+
+/* Phase 6E-B1: design-mode selector */
+.dmode{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin:.2rem 0 .8rem}
+.dmode__opt{text-align:left;background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:.7rem .8rem;cursor:pointer;display:flex;flex-direction:column;gap:.15rem;font-family:inherit}
+.dmode__opt b{font-size:.92rem}.dmode__opt small{color:var(--fg-muted);font-size:.78rem}
+.dmode__opt.is-on{border-color:var(--accent);box-shadow:0 0 0 3px rgba(18,104,232,.12)}
+@media(max-width:560px){.dmode{grid-template-columns:1fr}}

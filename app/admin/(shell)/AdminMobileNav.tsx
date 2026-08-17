@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Logout from './Logout';
+import { ADMIN_NAV_SHEET } from '@/lib/admin/nav';
 
 // Turkish admin, mobile-only chrome. Desktop keeps the existing sidebar (CSS hides
 // this below the breakpoint and hides the sidebar above it). No 404s: only real
@@ -28,22 +29,6 @@ const PRIMARY: Item[] = [
 ];
 
 // secondary areas shown in the sheet — href present = live route, else coming later
-const SECONDARY: { group: string; items: (Item | { label: string })[] }[] = [
-  { group: 'Katalog', items: [
-    { label: 'Ürünler', href: '/admin/urunler' },
-    { label: 'Medya', href: '/admin/medya' },
-    { label: 'Koleksiyonlar' }, { label: 'Kokular' },
-  ] },
-  { group: 'İçerik', items: [
-    { label: 'Ana Sayfa', href: '/admin/ana-sayfa' },
-    { label: 'Medya', href: '/admin/medya' },
-    { label: 'Çeviriler' }, { label: 'SEO' }, { label: 'Blog' }, { label: 'Yorumlar' },
-  ] },
-  { group: 'Operasyon', items: [
-    { label: 'Siparişler', href: '/admin/siparisler' },
-    { label: 'Teklifler' }, { label: 'Ayarlar' },
-  ] },
-];
 
 const TITLES: { match: (p: string) => boolean; title: string }[] = [
   { match: p => p === '/admin', title: 'Panel' },
@@ -105,17 +90,13 @@ export default function AdminMobileNav({ email }: { email?: string | null }) {
             <button className="adm__sheet-x" aria-label="Kapat" onClick={() => setOpen(false)}>×</button>
           </div>
           <div className="adm__sheet-body">
-            {SECONDARY.map(sec => (
+            {ADMIN_NAV_SHEET.map(sec => (
               <div key={sec.group} className="adm__sheet-group">
                 <div className="adm__sheet-label">{sec.group}</div>
-                {sec.items.map(it => 'href' in it ? (
-                  <Link key={it.label + it.href} href={it.href}
+                {sec.items.map(it => (
+                  <Link key={it.href} href={it.href}
                     aria-current={isActive(pathname, it.href) ? 'page' : undefined}
                     className="adm__sheet-link">{it.label}</Link>
-                ) : (
-                  <span key={it.label} className="adm__sheet-link is-soon" aria-disabled="true">
-                    {it.label}<em>yakında</em>
-                  </span>
                 ))}
               </div>
             ))}

@@ -4,12 +4,9 @@ import { requireAdmin } from '@/lib/supabase/admin-auth';
 import Logout from './Logout';
 import AdminMobileNav from './AdminMobileNav';
 
-const nav = [
-  ['Genel', [['Panel','/admin']]],
-  ['Katalog', [['Ürünler','/admin/urunler'],['Medya','/admin/medya'],['Koleksiyonlar','/admin/koleksiyonlar'],['Kokular','/admin/kokular']]],
-  ['İçerik', [['Ana sayfa','/admin/ana-sayfa'],['Çeviriler','/admin/ceviriler'],['SEO','/admin/seo']]],
-  ['Operasyon', [['Siparişler','/admin/siparisler'],['Teklifler','/admin/teklifler'],['Ayarlar','/admin/ayarlar']]],
-] as const;
+
+import { ADMIN_NAV as nav } from '@/lib/admin/nav';
+export const dynamic = 'force-dynamic';   // admin auth must run per-request, never statically cached
 
 export default async function AdminShellLayout({ children }: { children: ReactNode }) {
   const admin = await requireAdmin();                 // redirects to /admin/giris if not an admin
@@ -19,10 +16,10 @@ export default async function AdminShellLayout({ children }: { children: ReactNo
       <aside className="adm__side">
         <div className="adm__brand"><span className="logo__mark" />BUGO DUFT</div>
         <nav className="adm__nav">
-          {nav.map(([label, items]) => (
-            <div key={label}>
-              <div className="adm__navlabel">{label}</div>
-              {items.map(([t, href]) => <Link key={href} href={href}>{t}</Link>)}
+          {nav.map(({ group, items }) => (
+            <div key={group}>
+              <div className="adm__navlabel">{group}</div>
+              {items.map(({ label, href }) => <Link key={href} href={href}>{label}</Link>)}
             </div>
           ))}
         </nav>

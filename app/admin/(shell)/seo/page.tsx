@@ -1,0 +1,45 @@
+import Link from 'next/link';
+import { requireAdmin } from '@/lib/supabase/admin-auth';
+import { seoAudit } from '@/repositories/admin-audit';
+import { locales } from '@/i18n/config';
+export const metadata = { title: 'SEO · BUGO DUFT' };
+export const dynamic = 'force-dynamic';
+
+const TITLE_MAX = 60, DESC_MAX = 160;
+function flag(v: string, max: number) {
+  const n = v.trim().length;
+  if (n === 0) return { cls: 'adm-tag adm-tag--off', txt: 'eksik' };
+  if (n > max) return { cls: 'adm-tag adm-tag--off', txt: `${n} (uzun)` };
+  return { cls: 'adm-tag', txt: `${n}` };
+}
+
+const EDIT_ID: Record<string, string> = { 'BUGO-STD':'p-standard', 'BUGO-PRM':'p-premium', 'BUGO-DLX':'p-deluxe', 'BUGO-VIP':'p-vip' };
+
+export default async function AdminSeo() {
+  await requireAdmin();
+  const rows = await seoAudit();
+  return (
+    <>
+      <div className="adm__top"><div><h1>SEO</h1><div className="adm__crumb">İçerik / SEO</div></div></div>
+      <div className="adm-note" style={{ marginBottom:'var(--s-4)' }}><span>ⓘ</span>
+        <span>Başlık ≤ {TITLE_MAX}, açıklama ≤ {DESC_MAX} karakter önerilir. Metinler ürün editöründe düzenlenir;
+        eksik/uzun değerler burada işaretlenir. Canonical & hreflang gerçek yerelleştirilmiş slug’lardan üretilir.</span></div>
+      <div className="adm-panel">
+        {rows.length === 0 ? <p className="muted">Veri yok (Supabase yapılandırılmadı veya ürün yok).</p> :
+        <table className="adm-table">
+          <thead><tr><th>Ürün</th>{locales.map(l => <th key={l}>{l.toUpperCase()} başlık</th>)}{locales.map(l => <th key={l+'d'}>{l.toUpperCase()} açıklama</th>)}<th></th></tr></thead>
+          <tbody>
+            {rows.map(r => (
+              <tr key={r.id}>
+                <td><strong>{r.code}</strong></td>
+                {locales.map(l => { const f = flag(r.tr[l].title, TITLE_MAX); return <td key={l}><span className={f.cls}>{f.txt}</span></td>; })}
+                {locales.map(l => { const f = flag(r.tr[l].description, DESC_MAX); return <td key={l+'d'}><span className={f.cls}>{f.txt}</span></td>; })}
+                <td style={{ textAlign:'right' }}><Link className="adm-btn adm-btn--ghost" href={`/admin/urunler/${EDIT_ID[r.code] ?? ''}`}>Düzenle</Link></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>}
+      </div>
+    </>
+  );
+}

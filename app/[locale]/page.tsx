@@ -3,6 +3,9 @@ import { isLocale, type Locale } from '@/i18n/config';
 import { getDict } from '@/i18n';
 import { getHome } from '@/data/seed/homepage';
 import { getHomeExtra } from '@/repositories/homepage';
+import { getSettings } from '@/repositories/settings';
+import OrderSteps from '@/components/home/OrderSteps';
+import DesignIncluded from '@/components/home/DesignIncluded';
 import { listCollections, listScents, listIndustries, homeAlternates } from '@/repositories/catalog';
 import { getCollections } from '@/repositories/catalog.read';
 import { buildMetadata, organizationLd, faqLd } from '@/lib/seo';
@@ -40,28 +43,31 @@ export default async function HomePage({ params }: { params:{ locale:string } })
   const scents = listScents(locale);
   const industries = listIndustries(locale);
   const hc = await getHomeExtra(locale);
+  const sections = (await getSettings()).sections;
   const faqItems = hc.faqGroups.flatMap(g => g.items);
   return (
     <>
       <JsonLd data={[organizationLd(), faqLd(faqItems)]} />
       <Hero locale={locale} dict={dict} content={content} hc={hc} />
+      <OrderSteps locale={locale} />
       <X.TrustStats locale={locale} hc={hc} />
       <S.Collections locale={locale} dict={dict} cols={cols} />
       <S.HowItWorks locale={locale} content={content} />
+      <DesignIncluded locale={locale} />
       <S.ConfiguratorTeaser locale={locale} dict={dict} />
       <X.Production4 locale={locale} hc={hc} />
       <X.IndustriesCarousel locale={locale} hc={hc} />
-      <X.Gallery locale={locale} hc={hc} />
+      {sections.gallery && <X.Gallery locale={locale} hc={hc} />}
       <Scents locale={locale} scents={scents} heading={scentHead[locale]} />
       <X.BrandImpact locale={locale} hc={hc} />
       <X.WhyBugo2 locale={locale} hc={hc} />
       <X.ReviewsPreview locale={locale} hc={hc} />
       <S.Pricing locale={locale} cols={cols} dict={dict} />
       <QuoteForm locale={locale} />
-      <X.FaqGrouped locale={locale} hc={hc} />
+      {sections.faq && <X.FaqGrouped locale={locale} hc={hc} />}
       <X.SupportCta locale={locale} hc={hc} />
       <X.BlogPreview locale={locale} hc={hc} />
-      <X.LogoRail locale={locale} hc={hc} />
+      {sections.references && <X.LogoRail locale={locale} hc={hc} />}
       <S.FinalCta locale={locale} dict={dict} content={content} />
     </>
   );

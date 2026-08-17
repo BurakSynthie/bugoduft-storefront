@@ -8,7 +8,7 @@ import Reveal from '@/components/ui/Reveal';
 import { IconArrow } from '@/components/ui/icons';
 import { itemPath } from '@/lib/routing';
 
-type Col = { code:string; name:string; description:string; priceFromCents:number|null; productSlug:string|null; coverImage?:string|null };
+type Col = { code:string; name:string; description:string; priceFromCents:number|null; productSlug:string|null; coverImage?:string|null; compareAtCents?:number|null; promoActive?:boolean };
 
 const DETAILS: Record<Locale,string> = { de:'Details ansehen', en:'View details', fr:'Voir les détails' };
 
@@ -57,7 +57,7 @@ export function Collections({ locale, dict, cols }: { locale:Locale; dict:Dict; 
         <div className="grid grid-4">
           {cols.map(c => (
             <Reveal key={c.code}>
-              <article className="card ccard">
+              <article className={`card ccard${c.productSlug ? ' ccard--click' : ''}`}>
                 <div className="ccard__media" data-c={c.code}>
                   {c.coverImage && <img src={c.coverImage} alt={c.name} className="ccard__cover" loading="lazy" />}
                 </div>
@@ -69,9 +69,12 @@ export function Collections({ locale, dict, cols }: { locale:Locale; dict:Dict; 
                   <p className="muted" style={{ margin:'.4rem 0 var(--s-4)', fontSize:'.9rem' }}>{c.description}</p>
                   <div className="ccard__row">
                     {c.priceFromCents != null &&
-                      <Price cents={c.priceFromCents} currency="EUR" locale={locale} from={dict.common.from} label={dict.common.perOrder} />}
+                      <span style={{ display:'inline-flex', alignItems:'baseline', gap:'.4rem', flexWrap:'wrap' }}>
+                        <Price cents={c.priceFromCents} currency="EUR" locale={locale} from={dict.common.from} label={dict.common.perOrder} />
+                        {c.promoActive && c.compareAtCents && <span className="price-compare">{new Intl.NumberFormat(locale==='de'?'de-DE':locale==='en'?'en-IE':'fr-FR',{style:'currency',currency:'EUR'}).format(c.compareAtCents/100)}</span>}
+                      </span>}
                     {c.productSlug &&
-                      <Link href={itemPath('products', locale, c.productSlug)} className="ccard__details">
+                      <Link href={itemPath('products', locale, c.productSlug)} className="ccard__details ccard__stretch">
                         {DETAILS[locale]} <IconArrow size={15} />
                       </Link>}
                   </div>

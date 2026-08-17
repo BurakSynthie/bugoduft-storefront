@@ -41,10 +41,11 @@ export default function Editor({ initial, configured }: { initial: EditableProdu
   async function onSave() {
     setSave('saving'); setMsg(null);
     const res = await saveProductAction({
-      id: p.id, isActive: p.isActive, sortOrder: p.sortOrder,
+      productCode: p.productCode, isActive: p.isActive, sortOrder: p.sortOrder,
       basePriceCents: p.basePriceCents, minQty: p.minQty, qtyStep: p.qtyStep, maxQty: p.maxQty,
+      compareAtCents: p.compareAtCents, promoEnabled: p.promoEnabled, promoStart: p.promoStart, promoEnd: p.promoEnd,
       coverId: p.cover?.id ?? null, videoId: p.video?.id ?? null, posterId: p.poster?.id ?? null,
-      galleryIds: p.gallery.map(g => g.id), tr: p.tr,
+      galleryIds: p.gallery.map(g => g.id), tiers: p.tiers, tr: p.tr,
     });
     if (res.ok) { setSave('saved'); setTimeout(() => setSave('idle'), 2500); }
     else { setSave('error'); setMsg(res.message); }
@@ -120,6 +121,45 @@ export default function Editor({ initial, configured }: { initial: EditableProdu
         </div>
       </div>
 
+      {/* Staffelpreise (quantity tiers) */}
+      <div className="adm-panel">
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <strong>Staffelpreise (Menge → €/1.000)</strong>
+          <button className="adm-btn adm-btn--ghost" onClick={()=>setP(s=>({...s, tiers:[...s.tiers, { minQty:0, ratePer1000Cents:s.basePriceCents, badgeDe:'', badgeEn:'', badgeFr:'', isActive:true }]}))}>+ Kademe</button>
+        </div>
+        <p className="muted" style={{ fontSize:'.82rem', margin:'.3rem 0 var(--s-3)' }}>Her ürün bağımsızdır. Fiyat 1.000 adet başınadır; toplam = oran × (adet/1.000). Özel adet en yakın alt kademeye yuvarlanır.</p>
+        {p.tiers.length===0 ? <p className="muted">Kademe yok (temel fiyat kullanılır).</p> :
+          <div style={{ display:'grid', gap:'.5rem' }}>
+            {[...p.tiers].map((tt, i) => (
+              <div key={i} className="adm-grid2" style={{ alignItems:'end', gridTemplateColumns:'1fr 1fr auto auto', gap:'.5rem' }}>
+                <div className="field" style={{ margin:0 }}><label>Min. adet</label><input className="input" inputMode="numeric" value={tt.minQty} onChange={e=>setP(s=>({...s, tiers:s.tiers.map((x,j)=>j===i?{...x,minQty:num(e.target.value)}:x)}))} /></div>
+                <div className="field" style={{ margin:0 }}><label>€ / 1.000</label><MoneyInput cents={tt.ratePer1000Cents} onCents={c=>setP(s=>({...s, tiers:s.tiers.map((x,j)=>j===i?{...x,ratePer1000Cents:c ?? 0}:x)}))} /></div>
+                <div className="field" style={{ margin:0 }}><label>Toplam örn.</label><input className="input" readOnly value={`${((tt.ratePer1000Cents*(tt.minQty||0)/1000)/100).toFixed(0)} €`} /></div>
+                <button className="linkbtn" style={{ color:'#B42318' }} onClick={()=>setP(s=>({...s, tiers:s.tiers.filter((_,j)=>j!==i)}))}>Sil</button>
+              </div>
+            ))}
+          </div>}
+      </div>
+
+      {/* promotional / compare-at pricing (display only) */}
+      <div className="adm-panel">
+        <strong>Promosyon / referans fiyat (yalnızca gösterim)</strong>
+        <div className="adm-note" style={{ margin:'var(--s-3) 0' }}><span>ⓘ</span>
+          <span>Referans fiyat üstü çizili gösterilir; <b>ödeme fiyatını etkilemez</b>. Almanya PAngV §11 gereği,
+            girdiğiniz referans fiyat yasal olarak geçerli olmalıdır (genellikle önceki 30 gün içindeki en düşük fiyat).
+            Yapay/yanıltıcı indirim girmeyin.</span></div>
+        <label style={{ display:'inline-flex', gap:'.5rem', alignItems:'center', marginBottom:'var(--s-3)' }}>
+          <input type="checkbox" checked={p.promoEnabled} onChange={e=>setP(s=>({...s,promoEnabled:e.target.checked}))} /> Promosyon etkin
+        </label>
+        <div className="adm-grid2">
+          <div className="field"><label htmlFor="cmp">Referans (eski) fiyat</label>
+            <MoneyInput id="cmp" cents={p.compareAtCents ?? 0} onCents={c => setP(s => ({ ...s, compareAtCents: c && c>0 ? c : null }))} /></div>
+          <div className="field"><label>Güncel satış fiyatı</label><input className="input" value={(p.basePriceCents/100).toFixed(2)+' '+p.currency} readOnly /></div>
+          <div className="field"><label>Kampanya başlangıcı (ops.)</label><input className="input" type="date" value={p.promoStart? p.promoStart.slice(0,10):''} onChange={e=>setP(s=>({...s,promoStart:e.target.value? new Date(e.target.value).toISOString():null}))} /></div>
+          <div className="field"><label>Kampanya bitişi (ops.)</label><input className="input" type="date" value={p.promoEnd? p.promoEnd.slice(0,10):''} onChange={e=>setP(s=>({...s,promoEnd:e.target.value? new Date(e.target.value).toISOString():null}))} /></div>
+        </div>
+      </div>
+
       {/* per-language content */}
       <div className="adm-panel">
         <div className="adm-tabs" role="tablist">
@@ -138,6 +178,7 @@ export default function Editor({ initial, configured }: { initial: EditableProdu
           <div className="adm-grid2">
             <div className="field"><label>Kullanım alanı</label><textarea className="textarea" rows={2} value={t.useCase} onChange={e=>setTr({useCase:e.target.value})} /></div>
             <div className="field"><label>Rozet (badge)</label><input className="input" value={t.badge} onChange={e=>setTr({badge:e.target.value})} /></div>
+            <div className="field"><label>Kampanya rozeti (ops.)</label><input className="input" value={t.promoBadge} onChange={e=>setTr({promoBadge:e.target.value})} /></div>
             <div className="field"><label>Üretim bilgisi</label><textarea className="textarea" rows={2} value={t.productionInfo} onChange={e=>setTr({productionInfo:e.target.value})} /></div>
             <div className="field"><label>Teslimat bilgisi</label><textarea className="textarea" rows={2} value={t.deliveryInfo} onChange={e=>setTr({deliveryInfo:e.target.value})} /></div>
             <div className="field"><label>MOQ metni</label><input className="input" value={t.moqText} onChange={e=>setTr({moqText:e.target.value})} /></div>

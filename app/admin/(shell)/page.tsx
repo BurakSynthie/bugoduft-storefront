@@ -3,6 +3,7 @@ import { getDashboardMetrics, OP_STATUS_TR } from '@/repositories/orders';
 import { formatMoney } from '@/lib/money';
 import Link from 'next/link';
 export const metadata = { title: 'Panel · BUGO DUFT' };
+export const dynamic = 'force-dynamic';
 
 export default async function AdminDashboard() {
   await requireAdmin();

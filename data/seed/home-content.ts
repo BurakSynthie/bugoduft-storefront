@@ -16,6 +16,11 @@ export type Social = { email?: string; instagram?: string; facebook?: string; li
 
 export type HomeExtra = {
   heroProductImage: string | null;
+  heroVideo?: string | null;
+  heroPoster?: string | null;
+  heroEyebrow?: string;
+  heroHead?: string;
+  heroSub?: string;
   heroChips: string[];
   shippingIncluded: string;
   credibility: string[];              // e.g. "12+ Jahre Erfahrung"

@@ -5,6 +5,7 @@ import type { HomeContent } from '@/data/seed/homepage';
 import type { HomeExtra } from '@/data/seed/home-content';
 import { Container, Button } from '@/components/ui';
 import { IconCheck } from '@/components/ui/icons';
+import ProdVideo from '@/components/home/ProdVideo';
 
 const COPY = {
   de:{ head:'Individuelle Duftanhänger für Ihre Marke.',
@@ -26,9 +27,9 @@ export default function Hero({ locale, dict, content, hc }:
       <Container>
         <div className="hero__grid">
           <div>
-            <span className="eyebrow">{content.hero.eyebrow}</span>
-            <h1 style={{ marginTop:'var(--s-4)' }}>{c.head}</h1>
-            <p className="hero__sub">{c.sub}</p>
+            <span className="eyebrow">{hc.heroEyebrow || content.hero.eyebrow}</span>
+            <h1 style={{ marginTop:'var(--s-4)' }}>{hc.heroHead || c.head}</h1>
+            <p className="hero__sub">{hc.heroSub || c.sub}</p>
             <span className="hero__ship"><IconCheck size={14} /> {hc.shippingIncluded}</span>
             <div className="hero__cta">
               <Button href={configuratorPath(locale)} variant="primary" size="lg">{dict.cta.configure}</Button>
@@ -43,8 +44,10 @@ export default function Hero({ locale, dict, content, hc }:
           </div>
           {/* Real product visual slot: transparent PNG/WebP when provided (CMS-managed),
               otherwise the approved CSS product fallback. Subtle float, reduced-motion safe. */}
-          <div className="hero__visual" aria-hidden={hc.heroProductImage ? undefined : true}>
-            {hc.heroProductImage
+          <div className={`hero__visual${hc.heroVideo ? ' hero__visual--media' : ''}`} aria-hidden={(hc.heroProductImage || hc.heroVideo) ? undefined : true}>
+            {hc.heroVideo
+              ? <HeroMedia video={hc.heroVideo} poster={hc.heroPoster ?? null} />
+              : hc.heroProductImage
               ? <img className="hero__product" src={hc.heroProductImage} alt="BUGO DUFT Duftanhänger" width={520} height={650} />
               : <span className="hero__stage" aria-hidden="true"><span className="hero__cord" /><span className="hero__silhouette" /></span>}
           </div>
@@ -52,4 +55,10 @@ export default function Hero({ locale, dict, content, hc }:
       </Container>
     </section>
   );
+}
+
+// Hero video: reuses the decorative auto-loop/muted/no-controls player, wrapped for
+// responsive aspect on mobile (no giant fixed-height box).
+function HeroMedia({ video, poster }: { video: string; poster: string | null }) {
+  return <span className="hero__media"><ProdVideo src={video} poster={poster} label="BUGO DUFT" /></span>;
 }

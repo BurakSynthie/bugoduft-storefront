@@ -18,17 +18,19 @@ function fromSeed(p: ProductSeed): EditableProduct {
     const t = p.tr[l];
     tr[l] = { name:t.name, slug:t.slug, h1:t.h1, shortDesc:t.shortDesc, longDesc:t.longDesc,
       features:[], useCase:'', productionInfo:'', deliveryInfo:'', moqText:'', badge:'',
-      seoTitle:t.seo.title, seoDescription:t.seo.description, coverAlt:'' };
+      seoTitle:t.seo.title, seoDescription:t.seo.description, promoBadge:'', coverAlt:'' };
   }
   return { id:p.id, productCode:p.productCode, collectionCode:p.collectionCode, currency:p.currency,
     basePriceCents:p.basePriceCents, minQty:p.minQty, qtyStep:p.qtyStep, maxQty:p.maxQty,
-    isActive:p.isActive, sortOrder:0, cover:null, video:null, poster:null, gallery:[], tr };
+    isActive:p.isActive, sortOrder:0, compareAtCents:null, promoEnabled:false, promoStart:null, promoEnd:null,
+    tiers: (p.tiers||[]).map(t=>({minQty:t.minQty,ratePer1000Cents:t.unitPriceCents,badgeDe:'',badgeEn:'',badgeFr:'',isActive:true})),
+    cover:null, video:null, poster:null, gallery:[], tr };
 }
 
 export default async function AdminProductEditor({ params }: { params: { id: string } }) {
   const seed = getProductById(params.id);
   if (!seed) notFound();
   const configured = isSupabaseConfigured();
-  const initial = (configured ? await loadProduct(params.id) : null) ?? fromSeed(seed);
+  const initial = (configured ? await loadProduct(seed.productCode) : null) ?? fromSeed(seed);
   return <Editor initial={initial} configured={configured} />;
 }

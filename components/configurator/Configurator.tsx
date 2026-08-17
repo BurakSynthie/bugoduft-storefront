@@ -5,6 +5,7 @@ import type { Locale } from '@/i18n/config';
 import { formatMoney, formatQty } from '@/lib/money';
 import { validateQuantity, quantityMessage } from '@/lib/quantity';
 import { totalCents } from '@/lib/configurator/pricing';
+import { priceQuantity, type PriceTier } from '@/lib/pricing/tiers';
 import type { ArtworkRef, BugoConfiguration, Intensity, ShapeId } from '@/lib/configurator/types';
 import { firstConfigError, type ConfigError } from '@/lib/configurator/pricing';
 import { SHAPES, isDeferred, shapeGeometry } from '@/lib/configurator/shapes';
@@ -19,7 +20,7 @@ import {
   metaOf, refFromMeta, setFrontFile, setBackFile, setSupportingFiles, hasSessionFiles, type CfgDraft,
 } from '@/lib/configurator/draft';
 
-export type CfgCollection = { collectionCode:string; collectionName:string; productId:string; basePriceCents:number; scentCodes:string[] };
+export type CfgCollection = { collectionCode:string; collectionName:string; productId:string; basePriceCents:number; scentCodes:string[]; tiers?:PriceTier[] };
 export type CfgScent = { code:string; category:string; name:string; description:string };
 
 const QUICK = [1000,2000,5000,10000,25000,50000,100000];
@@ -83,10 +84,42 @@ const L = {
     cord:'Cordon : noir (fixe)' },
 } as const;
 
+// Design-mode copy: BUGO creates vs. customer provides a ready print file.
+const DM: Record<Locale,{ title:string; bugo:string; bugoHint:string; ready:string; readyHint:string; bugoNote:string; readyNote:string; uploadReady:string }> = {
+  de:{ title:'Design', bugo:'BUGO gestaltet mein Design', bugoHint:'Kostenlos, inkl. Korrekturen & Freigabe.',
+    ready:'Ich habe eine fertige Druckdatei', readyHint:'PDF/PNG/JPG – wir prüfen sie vor der Produktion.',
+    bugoNote:'Laden Sie Logo/Vorlagen hoch – wir erstellen den professionellen Entwurf und stimmen ihn mit Ihnen ab.',
+    readyNote:'Laden Sie Ihre finale Druckdatei hoch. Wir prüfen Auflösung, Beschnitt und Formen vor der Produktion – Sie erhalten eine Freigabe.',
+    uploadReady:'Druckdatei hochladen (PDF/PNG/JPG)' },
+  en:{ title:'Design', bugo:'BUGO creates my design', bugoHint:'Free, incl. revisions & approval.',
+    ready:'I have a ready print file', readyHint:'PDF/PNG/JPG – we check it before production.',
+    bugoNote:'Upload your logo/assets – we create the professional proof and align it with you.',
+    readyNote:'Upload your final print file. We check resolution, bleed and shapes before production – you receive an approval.',
+    uploadReady:'Upload print file (PDF/PNG/JPG)' },
+  fr:{ title:'Design', bugo:'BUGO crée mon design', bugoHint:'Gratuit, corrections & validation incluses.',
+    ready:'J’ai un fichier d’impression prêt', readyHint:'PDF/PNG/JPG – vérifié avant production.',
+    bugoNote:'Importez votre logo/éléments – nous créons le BAT professionnel et le validons avec vous.',
+    readyNote:'Importez votre fichier final. Nous vérifions résolution, fond perdu et formes avant production – vous recevez une validation.',
+    uploadReady:'Importer le fichier (PDF/PNG/JPG)' },
+};
+
 const catLabel: Record<Locale,Record<string,string>> = {
   de:{frisch:'Frisch',fruchtig:'Fruchtig',suess:'Süß',elegant:'Elegant',intensiv:'Intensiv'},
   en:{frisch:'Fresh',fruchtig:'Fruity',suess:'Sweet',elegant:'Elegant',intensiv:'Intense'},
   fr:{frisch:'Frais',fruchtig:'Fruité',suess:'Sucré',elegant:'Élégant',intensiv:'Intense'},
+};
+
+// Second, optional, FREE scent copy (no surcharge, no price change).
+const L2: Record<Locale,{ add:string; noSurcharge:string; hint:string; d1:string; d2:string; remove:string; free:string; choose2:string }> = {
+  de:{ add:'+ Zweiten Duft kostenlos wählen', noSurcharge:'2 Düfte ohne Aufpreis',
+    hint:'Auf Wunsch können Sie für Ihre Bestellung einen zweiten Duft auswählen.',
+    d1:'Duft 1', d2:'Duft 2', remove:'Entfernen', free:'kostenlos', choose2:'Zweiten Duft wählen' },
+  en:{ add:'+ Choose a second fragrance for free', noSurcharge:'2 fragrances at no extra charge',
+    hint:'If you like, you can add a second fragrance to your order.',
+    d1:'Scent 1', d2:'Scent 2', remove:'Remove', free:'free', choose2:'Choose a second fragrance' },
+  fr:{ add:'+ Choisir un deuxième parfum gratuitement', noSurcharge:'2 parfums sans supplément',
+    hint:'Si vous le souhaitez, vous pouvez ajouter un deuxième parfum à votre commande.',
+    d1:'Parfum 1', d2:'Parfum 2', remove:'Retirer', free:'gratuit', choose2:'Choisir un deuxième parfum' },
 };
 
 function ShapePreview({ shape, artwork, yourLogo }:{ shape:ShapeId; artwork:ArtworkRef|null; yourLogo:string }) {
@@ -110,8 +143,8 @@ function ShapePreview({ shape, artwork, yourLogo }:{ shape:ShapeId; artwork:Artw
   );
 }
 
-export default function Configurator({ locale, collections, scents, intenseCents, initialCollection }:
-  { locale:Locale; collections:CfgCollection[]; scents:CfgScent[]; intenseCents:number; initialCollection?:string }) {
+export default function Configurator({ locale, collections, scents, intenseCents, initialCollection, sampleThreshold = 5000, sampleValueEur = 40 }:
+  { locale:Locale; collections:CfgCollection[]; scents:CfgScent[]; intenseCents:number; initialCollection?:string; sampleThreshold?:number; sampleValueEur?:number }) {
   const t = L[locale];
   const T = sf(locale);
   const cart = useStorefront();
@@ -123,6 +156,9 @@ export default function Configurator({ locale, collections, scents, intenseCents
   const [quantity, setQuantity] = useState(1000);
   const [qtyText, setQtyText] = useState('');
   const [scentCode, setScentCode] = useState<string|null>(null);
+  const [scentCode2, setScentCode2] = useState<string|null>(null);
+  const [designMode, setDesignMode] = useState<'bugo_creates'|'ready_file'>('bugo_creates');
+  const [showSecond, setShowSecond] = useState(false);
   const [scentCat, setScentCat] = useState<string>('all');
   const [intensity, setIntensity] = useState<Intensity>('normal');
   const [shape, setShape] = useState<ShapeId>('rectangle');
@@ -150,6 +186,8 @@ export default function Configurator({ locale, collections, scents, intenseCents
     if (d.collectionCode && collections.find(c=>c.collectionCode===d.collectionCode)) setCollectionCode(d.collectionCode);
     setQuantity(d.quantity || 1000); setQtyText(d.qtyText || '');
     setScentCode(d.scentCode); setScentCat(d.scentCat || 'all');
+    setScentCode2(d.scentCode2 ?? null); setShowSecond(!!d.scentCode2);
+    if(d.designMode) setDesignMode(d.designMode);
     setIntensity(d.intensity); setShape(d.shape);
     setFront(refFromMeta(d.frontMeta)); setFrontNotes(d.frontNotes || '');
     setSameBack(d.sameBack); setBack(refFromMeta(d.backMeta)); setBackNotes(d.backNotes || '');
@@ -157,8 +195,16 @@ export default function Configurator({ locale, collections, scents, intenseCents
     setStep(Math.min(7, Math.max(0, d.step || 0)));
   }
   useEffect(()=>{
+    const explicit = initialCollection && collections.find(c=>c.collectionCode===initialCollection) ? initialCollection : null;
     const d = loadDraft();
     const live = getLive();
+    // Explicit product selection from a Product Detail CTA (?k=) must win over a
+    // stale draft. Only continue a draft silently if it's for the SAME collection.
+    if (explicit) {
+      if (d && live === d.configId && d.collectionCode === explicit) { configIdRef.current = d.configId; applyDraft(d); setLive(d.configId); }
+      else { setCollectionCode(explicit); configIdRef.current = newConfigId(); setLive(configIdRef.current); }
+      setHydrated(true); return;
+    }
     if (d && live === d.configId) { configIdRef.current = d.configId; applyDraft(d); setLive(d.configId); }
     else if (isMeaningful(d) && d) { configIdRef.current = d.configId; setRecover(d); }
     else {
@@ -172,10 +218,17 @@ export default function Configurator({ locale, collections, scents, intenseCents
 
   const available = useMemo(()=> scents.filter(s=> col?.scentCodes.includes(s.code)), [scents, col]);
   useEffect(()=>{ if(scentCode && !available.find(s=>s.code===scentCode)) setScentCode(null); },[available,scentCode]);
+  useEffect(()=>{ if(scentCode2 && (!available.find(s=>s.code===scentCode2) || scentCode2===scentCode)) setScentCode2(null); },[available,scentCode2,scentCode]);
   const shownScents = scentCat==='all' ? available : available.filter(s=>s.category===scentCat);
 
   const base = col?.basePriceCents ?? 0;
-  const total = totalCents(base, intensity, intenseCents);
+  const cfgTiers: PriceTier[] = (col?.tiers && col.tiers.length) ? col.tiers : [{ minQty:1000, ratePer1000Cents: base }];
+  const qp = priceQuantity(cfgTiers, quantity);
+  const surchargeCents = intensity === 'intense' ? intenseCents : 0;
+  const unitRateCents = qp.ratePer1000Cents;
+  const total = qp.totalCents + surchargeCents;          // full order total (display; server is authority)
+  const savingsCents = qp.savingsCents;
+  const freeSample = sampleThreshold > 0 && quantity >= sampleThreshold;
   const qtyErr = validateQuantity(quantity, {min:1000,max:100000,step:1000});
   const backArtwork = sameBack ? front : back;
 
@@ -192,16 +245,16 @@ export default function Configurator({ locale, collections, scents, intenseCents
 
   const buildConfig = (): BugoConfiguration => ({
     productId: col.productId, collectionCode: col.collectionCode, quantity,
-    scentCode, intensity, shape,
+    scentCode, scentCode2, designMode, intensity, shape,
     frontArtwork: front, frontInstructions: frontNotes,
     sameBackAsFront: sameBack, backArtwork: sameBack ? null : back, backInstructions: sameBack ? '' : backNotes,
-    supportingFiles: supporting, basePriceCents: base, surchargeCents: total-base, totalPriceCents: total,
+    supportingFiles: supporting, basePriceCents: base, surchargeCents, totalPriceCents: total,
     currency:'EUR', locale,
   });
 
   const currentDraft = (): CfgDraft => ({
     v:1, configId: configIdRef.current, collectionCode,
-    quantity, qtyText, scentCode, scentCat, intensity, shape,
+    quantity, qtyText, scentCode, scentCode2, designMode, scentCat, intensity, shape,
     frontMeta: metaOf(front), frontNotes, sameBack, backMeta: metaOf(back), backNotes,
     supportingMeta: supporting.map(s=>({ name:s.name, type:s.type, size:s.size })),
     step, locale, updatedAt: Date.now(),
@@ -215,12 +268,13 @@ export default function Configurator({ locale, collections, scents, intenseCents
     saveTimer.current = setTimeout(()=> saveDraft(currentDraft()), 300);
     return ()=>{ if (saveTimer.current) clearTimeout(saveTimer.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[hydrated, recover, collectionCode, quantity, qtyText, scentCode, scentCat, intensity, shape, front, frontNotes, sameBack, back, backNotes, supporting, step]);
+  },[hydrated, recover, collectionCode, quantity, qtyText, scentCode, scentCode2, designMode, scentCat, intensity, shape, front, frontNotes, sameBack, back, backNotes, supporting, step]);
 
   // clear inline step error when the relevant inputs / step change
   useEffect(()=>{ setStepError(null); },[step, front, frontNotes, back, backNotes, scentCode, quantity, sameBack]);
 
   const scentName = scents.find(s=>s.code===scentCode)?.name ?? null;
+  const scentName2 = scents.find(s=>s.code===scentCode2)?.name ?? null;
   const shapeLabel = SHAPES.find(s=>s.id===shape)?.labelDe;
   const designStatus = front && frontNotes.trim() && (sameBack || (back && backNotes.trim())) ? t.ready : t.incomplete;
 
@@ -255,13 +309,13 @@ export default function Configurator({ locale, collections, scents, intenseCents
     return {
       cartItemId: `ci-${configIdRef.current}`, configId: configIdRef.current,
       productId: col.productId, collectionCode: col.collectionCode, collectionName: col.collectionName,
-      quantity, scentCode, scentName, intensity, shape, shapeLabel: SHAPE_L[shape][locale],
+      quantity, scentCode, scentName, scentCode2, scentName2, intensity, shape, shapeLabel: SHAPE_L[shape][locale],
       frontName: front?.name ?? null, frontMeta: metaOf(front), frontInstructions: frontNotes,
       sameBackAsFront: sameBack,
       backName: sameBack ? null : (back?.name ?? null), backMeta: sameBack ? null : metaOf(back),
       backInstructions: sameBack ? '' : backNotes,
       frontPath:null, backPath:null, supporting:[], filesPersisted:false,
-      basePriceCents: base, surchargeCents: total-base, priceCents: total, currency:'EUR', locale, updatedAt: Date.now(),
+      basePriceCents: base, surchargeCents, priceCents: total, currency:'EUR', locale, updatedAt: Date.now(),
     };
   }
   function addToCart(){
@@ -365,7 +419,15 @@ export default function Configurator({ locale, collections, scents, intenseCents
                 <input id="qty-other" className="input" inputMode="numeric" placeholder="z. B. 3.000"
                   value={qtyText} onChange={e=>applyQtyText(e.target.value)}/>
               </div>
-              {qtyErr && <p className="cfg-error" role="alert">{quantityMessage(qtyErr,locale)}</p>}</>)}
+              {qtyErr && <p className="cfg-error" role="alert">{quantityMessage(qtyErr,locale)}</p>}
+              {!qtyErr && (
+                <div className="tierbox">
+                  <div className="tierbox__row"><span>{formatQty(quantity,locale)} {t.pieces}</span><b>{formatMoney(unitRateCents,'EUR',locale)} / 1.000</b></div>
+                  <div className="tierbox__row tierbox__total"><span>{locale==='de'?'Gesamt':locale==='en'?'Total':'Total'}</span><b>{formatMoney(total,'EUR',locale)}</b></div>
+                  {savingsCents>0 && <div className="tierbox__save">{locale==='de'?'Sie sparen':locale==='en'?'You save':'Vous économisez'} {formatMoney(savingsCents,'EUR',locale)}</div>}
+                  {freeSample && <div className="tierbox__sample">🎁 {locale==='de'?`40 Düfte Musterpaket kostenlos inklusive · Wert: ${sampleValueEur} €`:locale==='en'?`Free 40-fragrance sample set included · Value: €${sampleValueEur}`:`Coffret 40 parfums offert · Valeur : ${sampleValueEur} €`}</div>}
+                </div>
+              )}</>)}
 
             {block(2, <><div className="cfg__legend">{t.scent}</div>
               <div className="chips" role="group" aria-label={t.scent} style={{marginBottom:'.75rem'}}>
@@ -380,6 +442,31 @@ export default function Configurator({ locale, collections, scents, intenseCents
                     <span className="scent-cat">{catLabel[locale][s.category]}</span>
                     <b>{s.name}</b><small>{s.description}</small>
                   </button>))}
+              </div>
+              {/* optional FREE second scent */}
+              <div className="cfg-second">
+                {!showSecond ? (
+                  <button type="button" className="cfg-second__add" onClick={()=>setShowSecond(true)} disabled={!scentCode}>
+                    {L2[locale].add}
+                    <span className="cfg-second__free">{L2[locale].noSurcharge}</span>
+                  </button>
+                ) : (
+                  <div className="cfg-second__panel">
+                    <div className="cfg-second__head">
+                      <strong>{L2[locale].d2} · <span className="cfg-second__tag">{L2[locale].free}</span></strong>
+                      <button type="button" className="linkbtn" onClick={()=>{ setShowSecond(false); setScentCode2(null); }}>{L2[locale].remove}</button>
+                    </div>
+                    <p className="muted" style={{ margin:'0 0 .5rem', fontSize:'.85rem' }}>{L2[locale].hint}</p>
+                    <div className="scentsel" role="radiogroup" aria-label={L2[locale].choose2}>
+                      {available.filter(s=>s.code!==scentCode).map(s=>(
+                        <button key={s.code} type="button" role="radio" aria-checked={scentCode2===s.code} className="tile"
+                          onClick={()=>setScentCode2(s.code===scentCode2 ? null : s.code)}>
+                          <span className="scent-cat">{catLabel[locale][s.category]}</span>
+                          <b>{s.name}</b><small>{s.description}</small>
+                        </button>))}
+                    </div>
+                  </div>
+                )}
               </div></>)}
 
             {block(3, <><div className="cfg__legend">{t.intensity}</div>
@@ -405,7 +492,16 @@ export default function Configurator({ locale, collections, scents, intenseCents
               {isDeferred(shape) && <p className="deferred-note">{t.deferredNote}</p>}</>)}
 
             {block(5, <><div className="cfg__legend">{t.front}</div>
-              <Upload id="up-front" label={t.uploadFront} value={front} onChange={chooseFront} locale={locale}/>
+              <div className="dmode" role="radiogroup" aria-label={DM[locale].title}>
+                <button type="button" role="radio" aria-checked={designMode==='bugo_creates'} className={`dmode__opt${designMode==='bugo_creates'?' is-on':''}`} onClick={()=>setDesignMode('bugo_creates')}>
+                  <b>{DM[locale].bugo}</b><small>{DM[locale].bugoHint}</small>
+                </button>
+                <button type="button" role="radio" aria-checked={designMode==='ready_file'} className={`dmode__opt${designMode==='ready_file'?' is-on':''}`} onClick={()=>setDesignMode('ready_file')}>
+                  <b>{DM[locale].ready}</b><small>{DM[locale].readyHint}</small>
+                </button>
+              </div>
+              <p className="cfg__note">{designMode==='ready_file'?DM[locale].readyNote:DM[locale].bugoNote}</p>
+              <Upload id="up-front" label={designMode==='ready_file'?DM[locale].uploadReady:t.uploadFront} value={front} onChange={chooseFront} locale={locale}/>
               <div className="field" style={{marginTop:'.75rem'}}>
                 <label htmlFor="fn">{t.frontNotes} · {t.designTeam}</label>
                 <textarea id="fn" className="textarea" rows={3} placeholder={t.ph} value={frontNotes} onChange={e=>setFrontNotes(e.target.value)}/>
@@ -433,7 +529,7 @@ export default function Configurator({ locale, collections, scents, intenseCents
 
             {block(7, <><div className="cfg__legend">{t.review}</div>
               <Summary locale={locale} t={t} colName={col?.collectionName} quantity={quantity}
-                scentName={scentName} intensity={intensity} shapeLabel={shapeLabel}
+                scentName={scentName} scentName2={scentName2} intensity={intensity} shapeLabel={shapeLabel}
                 front={front} sameBack={sameBack} back={back} designStatus={designStatus}
                 base={base} total={total} onEdit={setStep} inline/>
               <button type="button" className="btn btn--primary btn--lg" style={{marginTop:'var(--s-5)'}}
@@ -451,7 +547,7 @@ export default function Configurator({ locale, collections, scents, intenseCents
             <p className="preview__note">{t.previewNote}</p>
             <p className="cfg-autosave cfg-autosave--aside">{T.autosave}</p>
             <Summary locale={locale} t={t} colName={col?.collectionName} quantity={quantity}
-              scentName={scentName} intensity={intensity} shapeLabel={shapeLabel}
+              scentName={scentName} scentName2={scentName2} intensity={intensity} shapeLabel={shapeLabel}
               front={front} sameBack={sameBack} back={back} designStatus={designStatus}
               base={base} total={total} onEdit={setStep}/>
             <button type="button" className="btn btn--primary btn--block" style={{marginTop:'var(--s-4)'}}
@@ -494,7 +590,7 @@ export default function Configurator({ locale, collections, scents, intenseCents
   );
 }
 
-function Summary({ locale,t,colName,quantity,scentName,intensity,shapeLabel,front,sameBack,back,designStatus,base,total,onEdit,inline }:any){
+function Summary({ locale,t,colName,quantity,scentName,scentName2,intensity,shapeLabel,front,sameBack,back,designStatus,base,total,onEdit,inline }:any){
   const row=(k:string,v:ReactNode,step?:number)=>(<><dt>{k}</dt><dd>{v}{step!=null&&onEdit&&<button type="button" onClick={()=>onEdit(step)} style={{marginLeft:'.4rem',color:'var(--accent)',background:'none',border:0,cursor:'pointer',fontSize:'.78rem'}}>{t.edit}</button>}</dd></>);
   return (
     <div className="summary">
@@ -503,6 +599,7 @@ function Summary({ locale,t,colName,quantity,scentName,intensity,shapeLabel,fron
         {row(t.collection, colName, 0)}
         {row(t.qty, `${formatQty(quantity,locale)} ${t.pieces}`, 1)}
         {row(t.scent, scentName ?? '—', 2)}
+        {scentName2 && row(L2[locale as Locale].d2+" ("+L2[locale as Locale].free+")", scentName2, 2)}
         {row(t.intensity, intensity==='intense'?t.intense:t.normal, 3)}
         {row(t.shape, shapeLabel, 4)}
         {row(t.front, front?front.name:'—', 5)}
@@ -510,7 +607,6 @@ function Summary({ locale,t,colName,quantity,scentName,intensity,shapeLabel,fron
         {row(t.designStatus, designStatus)}
       </dl>
       <div className="summary__total"><span className="muted">{t.price}</span><span className="price">{formatMoney(total,'EUR',locale)}</span></div>
-      {total!==base && <div className="cfg__note" style={{textAlign:'right'}}>{formatMoney(base,'EUR',locale)} + {formatMoney(total-base,'EUR',locale)}</div>}
     </div>
   );
 }

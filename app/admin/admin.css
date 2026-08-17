@@ -143,3 +143,10 @@ body.adm-lock{overflow:hidden}
 .media-slot{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff}
 .media-slot img,.media-slot video{width:100%;max-height:180px;object-fit:cover;display:block;background:var(--c-gray)}
 .media-slot__act{display:flex;justify-content:space-between;padding:.4rem .5rem;gap:.5rem}
+
+/* Phase 6D: quote detail definition list */
+.adm-dl{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.adm-dl>div{display:flex;flex-direction:column;gap:.1rem;min-width:0}
+.adm-dl dt{font-size:.72rem;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.04em}
+.adm-dl dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+@media(max-width:560px){.adm-dl{grid-template-columns:1fr}}

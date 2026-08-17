@@ -6,6 +6,7 @@ import type { Dict } from '@/i18n';
 import { IconSearch, IconMenu } from '@/components/ui/icons';
 import { Button } from '@/components/ui';
 import LanguageSwitcher from './LanguageSwitcher';
+import QuickLangSwitcher from './QuickLangSwitcher';
 import CurrencySwitcher from './CurrencySwitcher';
 import CartButton from '@/components/storefront/CartButton';
 import { useStorefront } from '@/lib/cart/store';
@@ -32,7 +33,11 @@ export default function Header({ locale, dict, nav, alternates }:
         <div className="header__actions">
           <div className="hide-mobile"><LanguageSwitcher current={locale} alternates={alternates} /></div>
           <div className="hide-mobile"><CurrencySwitcher /></div>
+          <span className="only-mobile"><QuickLangSwitcher current={locale} alternates={alternates} /></span>
           <button className="iconbtn" aria-label={dict.common.search} onClick={openSearch}><IconSearch /></button>
+          <Link className="iconbtn" href={`/${locale}/konto`} aria-label="Konto">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+          </Link>
           <CartButton locale={locale} />
           <span className="hide-mobile"><Button href={`/${locale}#angebot`} variant="dark">{dict.cta.quote}</Button></span>
           <button className="iconbtn burger" aria-label={dict.common.menu} onClick={openMenu}><IconMenu /></button>

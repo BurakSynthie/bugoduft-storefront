@@ -17,8 +17,10 @@ import { IconArrow, IconCheck } from '@/components/ui/icons';
 import JsonLd from '@/seo/JsonLd';
 import Configurator from '@/components/configurator/Configurator';
 import { listProducts as _lp, listCollections as _lc, listScents as _ls } from '@/repositories/catalog';
-import { getProductBySlug as getProductBySlugRead, getProducts as getProductsRead, getCollections as getCollectionsRead } from '@/repositories/catalog.read';
+import { getSettings } from '@/repositories/settings';
+import { getProductBySlug as getProductBySlugRead, getProducts as getProductsRead, getCollections as getCollectionsRead, getScents as getScentsRead, getProductAlternates } from '@/repositories/catalog.read';
 
+const DETAILS: Record<string,string> = { de:'Details ansehen', en:'View details', fr:'Voir les détails' };
 type Params = { locale: string; slug: string[] };
 
 // -------- resolve a path into a typed route --------
@@ -54,9 +56,11 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const r = resolve(locale, params.slug);
   if (!r) return {};
   if (r.kind === 'product') {
-    const p = getProductBySlug(locale, r.slug); if (!p) return {};
+    const p = await getProductBySlugRead(locale, r.slug); if (!p) return {};
+    const alternates = await getProductAlternates(p.groupId);
     return buildMetadata({ locale, path: itemPath('products', locale, p.slug),
-      title: p.seo.title, description: p.seo.description, alternates: productAlternates(p.groupId), ogType:'article' });
+      title: p.seo.title, description: p.seo.description, alternates, ogType:'article',
+      ogImage: p.coverImage ?? undefined });
   }
   if (r.kind === 'industry') {
     const i = getIndustryBySlug(locale, r.slug); if (!i) return {};
@@ -80,7 +84,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 }
 
 // -------- page --------
-export default async function CatchAll({ params }: { params: Params }) {
+export default async function CatchAll({ params, searchParams }: { params: Params; searchParams?: { k?: string } }) {
   if (!isLocale(params.locale)) notFound();
   const locale = params.locale as Locale;
   const dict = getDict(locale);
@@ -95,12 +99,16 @@ export default async function CatchAll({ params }: { params: Params }) {
     const collections = cols.map(c => {
       const p = products.find(pp => pp.collectionCode === c.code)!;
       return { collectionCode:c.code, collectionName:c.name, productId:p.id,
-        basePriceCents:p.basePriceCents, scentCodes:p.scentCodes };
+        basePriceCents:p.basePriceCents, scentCodes:p.scentCodes,
+        tiers:(p.tiers||[]).map(tt=>({minQty:tt.minQty, ratePer1000Cents:tt.unitPriceCents})) };
     });
-    const scents = _ls(locale);
+    const sset = (await getSettings()).sample;
+    const scents = await getScentsRead(locale);
     const intense = products[0]?.options.find(o => o.key === 'intense_fragrance');
+    const k = searchParams?.k && collections.find(c => c.collectionCode === searchParams.k) ? searchParams.k : undefined;
     return <Configurator locale={locale} collections={collections} scents={scents}
-      intenseCents={intense ? intense.priceDeltaCents : 3000} />;
+      intenseCents={intense ? intense.priceDeltaCents : 3000} initialCollection={k}
+      sampleThreshold={sset.enabled ? sset.threshold : 0} sampleValueEur={sset.valueEur} />;
   }
 
   if (r.kind === 'product') {
@@ -124,11 +132,14 @@ export default async function CatchAll({ params }: { params: Params }) {
             <div className="hero__grid">
               <div>
                 <span className="eyebrow">{p.collectionCode}</span>
+                {p.badge && <Badge accent>{p.badge}</Badge>}
+                {p.promoActive && p.promoBadge && <Badge accent>{p.promoBadge}</Badge>}
                 <h1 style={{ fontSize:'var(--t-h2)', marginTop:'var(--s-3)' }}>{p.h1}</h1>
-                <p className="lede">{p.longDesc}</p>
-                <div style={{ margin:'var(--s-6) 0', display:'flex', alignItems:'baseline', gap:'var(--s-3)' }}>
+                <p className="lede">{p.shortDesc || p.longDesc}</p>
+                <div style={{ margin:'var(--s-6) 0', display:'flex', alignItems:'baseline', gap:'var(--s-3)', flexWrap:'wrap' }}>
                   <Price cents={p.priceFromCents} currency={p.currency} locale={locale} from={dict.common.from} />
-                  <span className="muted" style={{ fontSize:'.85rem' }}>{dict.common.perOrder} · {dict.common.minOrder}</span>
+                  {p.promoActive && p.compareAtCents && <span className="price-compare">{formatMoney(p.compareAtCents, p.currency, locale)}</span>}
+                  <span className="muted" style={{ fontSize:'.85rem' }}>{p.moqText || `${dict.common.perOrder} · ${dict.common.minOrder}`}</span>
                 </div>
                 {/* Volume tiers (server-authoritative pricing surfaced honestly) */}
                 <div className="card" style={{ padding:'var(--s-5)', marginBottom:'var(--s-5)' }}>
@@ -174,6 +185,53 @@ export default async function CatchAll({ params }: { params: Params }) {
                 </div>
               </div>
             </div>
+            {(
+              <div className="pdp__info">
+                {p.features.length>0 && (
+                  <div className="pdp__block">
+                    <h2>{locale==='de'?'Highlights':locale==='en'?'Highlights':'Points forts'}</h2>
+                    <ul className="pdp__features">
+                      {p.features.map((f,i)=>(<li key={i}><IconCheck size={16} /> {f}</li>))}
+                    </ul>
+                  </div>
+                )}
+                {p.useCase && (
+                  <div className="pdp__block">
+                    <h2>{locale==='de'?'Ideal für':locale==='en'?'Ideal for':'Idéal pour'}</h2>
+                    <p className="muted">{p.useCase}</p>
+                  </div>
+                )}
+                {(p.longDesc && p.longDesc!==p.shortDesc) && (
+                  <div className="pdp__block">
+                    <h2>{locale==='de'?'Details':locale==='en'?'Details':'Détails'}</h2>
+                    <p className="muted">{p.longDesc}</p>
+                  </div>
+                )}
+                {p.productionInfo && (
+                  <div className="pdp__block">
+                    <h2>{locale==='de'?'Produktion':locale==='en'?'Production':'Production'}</h2>
+                    <p className="muted">{p.productionInfo}</p>
+                  </div>
+                )}
+                {p.deliveryInfo && (
+                  <div className="pdp__block">
+                    <h2>{locale==='de'?'Lieferung':locale==='en'?'Delivery':'Livraison'}</h2>
+                    <p className="muted">{p.deliveryInfo}</p>
+                  </div>
+                )}
+                <div className="pdp__block">
+                  <h2>{locale==='de'?'Im Preis enthalten':locale==='en'?'Included in the price':'Inclus dans le prix'}</h2>
+                  <ul className="pdp__features">
+                    {(locale==='de'
+                      ? ['Individuelle Gestaltung','Vorder- & Rückseite','Korrekturen','Druckdatenprüfung','Persönliche Abstimmung','Freigabe vor Produktion']
+                      : locale==='en'
+                      ? ['Custom design','Front & back','Revisions','Print-file check','Personal coordination','Approval before production']
+                      : ['Design personnalisé','Recto & verso','Corrections','Vérification des fichiers','Coordination personnelle','Validation avant production']
+                    ).map((f,i)=>(<li key={i}><IconCheck size={16} /> {f}</li>))}
+                  </ul>
+                </div>
+              </div>
+            )}
           </Container>
         </section>
       </>
@@ -214,14 +272,20 @@ export default async function CatchAll({ params }: { params: Params }) {
             {cols.map(c => {
               const p = products.find(pp => pp.collectionCode === c.code);
               return (
-                <article key={c.code} className="card ccard">
-                  <div className="ccard__media" data-c={c.code} />
+                <article key={c.code} className={`card ccard${p ? ' ccard--click' : ''}`}>
+                  <div className="ccard__media" data-c={c.code}>
+                    {c.coverImage && <img src={c.coverImage} alt={c.name} className="ccard__cover" loading="lazy" />}
+                  </div>
                   <div className="ccard__body">
                     <div className="ccard__row"><h3>{c.name}</h3>{c.code==='VIP' && <Badge accent>Top</Badge>}</div>
                     <p className="muted" style={{ margin:'.4rem 0 var(--s-4)', fontSize:'.9rem' }}>{c.description}</p>
                     <div className="ccard__row">
-                      {c.priceFromCents!=null && <Price cents={c.priceFromCents} currency="EUR" locale={locale} from={dict.common.from} label={dict.common.perOrder} />}
-                      {p && <Link href={itemPath('products', locale, p.slug)} className="iconbtn" aria-label={c.name}><IconArrow size={18} /></Link>}
+                      {c.priceFromCents!=null &&
+                        <span style={{ display:'inline-flex', alignItems:'baseline', gap:'.4rem', flexWrap:'wrap' }}>
+                          <Price cents={c.priceFromCents} currency="EUR" locale={locale} from={dict.common.from} label={dict.common.perOrder} />
+                          {c.promoActive && c.compareAtCents && <span className="price-compare">{new Intl.NumberFormat(locale==='de'?'de-DE':locale==='en'?'en-IE':'fr-FR',{style:'currency',currency:'EUR'}).format(c.compareAtCents/100)}</span>}
+                        </span>}
+                      {p && <Link href={itemPath('products', locale, p.slug)} className="ccard__details ccard__stretch">{DETAILS[locale]} <IconArrow size={15} /></Link>}
                     </div>
                   </div>
                 </article>

@@ -39,8 +39,12 @@ export default async function OrderDetail({ params }:{ params:{ id:string } }){
             {kv('Kollektion',c.collection_code||'—')}
             {kv('Menge',c.quantity!=null?`${formatQty(c.quantity,'de')} Stück`:'—')}
             {kv('Duft',c.scent_code||'—')}
+            {c.scent_code_2 && kv('Duft 2 (kostenlos)',c.scent_code_2)}
             {kv('Duftintensität',c.intensity==='intense'?'Intensivduft (+30,00 €)':'Normalduft')}
             {kv('Form',c.shape||'—')}
+            {kv('Designmodus',c.design_mode==='ready_file'?'Fertige Druckdatei':'BUGO erstellt Design')}
+            {c.free_sample_set && kv('40-Düfte Musterset','kostenlos inklusive')}
+            {c.total_price_cents!=null && kv('Gesamtpreis (BUGO)',`${(c.total_price_cents/100).toFixed(2)} €`)}
             {kv('Preis',o.total_paid_cents!=null?formatMoney(o.total_paid_cents,o.currency||'EUR','de'):(c.total_price_cents!=null?formatMoney(c.total_price_cents,'EUR','de'):'—'))}
           </dl>
         </div>

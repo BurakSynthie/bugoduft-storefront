@@ -1,3 +1,4 @@
+import ProdVideo from './ProdVideo';
 import Link from 'next/link';
 import type { Locale } from '@/i18n/config';
 import { Container, SectionHeader, Button } from '@/components/ui';
@@ -61,7 +62,7 @@ export function Production4({ locale, hc }:{ locale:Locale; hc:HomeExtra }) {
             <article className="prodcard" key={p.n}>
               <div className="prodcard__media">
                 {p.video
-                  ? <video preload="none" muted playsInline controls poster={p.poster ?? undefined}><source src={p.video} /></video>
+                  ? <ProdVideo src={p.video} poster={p.poster} label={p.title} />
                   : p.poster ? <img src={p.poster} alt={p.title} loading="lazy" />
                   : <span className="prodcard__ph">{p.n}</span>}
               </div>

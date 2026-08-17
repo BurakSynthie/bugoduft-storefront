@@ -30,3 +30,17 @@ export async function getCollections(locale: Locale) {
   }
   return seed.listCollections(locale);
 }
+
+export async function getScents(locale: Locale) {
+  if (isSupabaseConfigured()) {
+    try { const r = await dbq.listScentsDb(locale); if (r.length) return r; } catch {}
+  }
+  return seed.listScents(locale);
+}
+
+// hreflang alternates for a product group — DB slugs first, seed fallback.
+export async function getProductAlternates(groupId: string): Promise<Record<Locale, string>> {
+  const fallback = seed.productAlternates(groupId);
+  if (isSupabaseConfigured()) { try { return await dbq.productAlternatesDb(groupId, fallback); } catch {} }
+  return fallback;
+}

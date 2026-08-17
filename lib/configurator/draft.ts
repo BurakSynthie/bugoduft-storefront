@@ -20,6 +20,8 @@ export type CfgDraft = {
   quantity: number;
   qtyText: string;
   scentCode: string | null;
+  scentCode2?: string | null;
+  designMode?: 'bugo_creates' | 'ready_file';
   scentCat: string;
   intensity: Intensity;
   shape: ShapeId;

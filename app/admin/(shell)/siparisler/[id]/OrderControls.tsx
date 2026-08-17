@@ -10,7 +10,11 @@ export function StatusControl({ id, current }:{ id:string; current:string }){
     <div className="adm-toolbar" style={{marginTop:'var(--s-3)'}}>
       {STATUSES.map(([k,label])=>(
         <button key={k} className={`adm-btn${k===current?' adm-btn--primary':''}`} disabled={pending}
-          onClick={()=>start(async()=>{ const r=await actSetStatus(id,k as any); setMsg(r.ok?null:'Hata'); })}>{label}</button>))}
+          onClick={()=>start(async()=>{
+            const r:any=await actSetStatus(id,k as any);
+            if(r?.warn){ if(confirm(`${r.message}\n\nYine de üretime almak istiyor musunuz?`)){ const f:any=await actSetStatus(id,k as any,true); setMsg(f.ok?null:'Hata'); } else setMsg(null); }
+            else setMsg(r.ok?null:'Hata');
+          })}>{label}</button>))}
     </div>
     <button className="adm-btn adm-btn--ghost" disabled={pending} style={{marginTop:'.5rem'}}
       onClick={()=>start(async()=>{ const r=await actApprove(id); setMsg(r.ok?'Tasarım onaylandı':'Hata'); })}>Tasarım Onaylandı → Üretime al</button>
