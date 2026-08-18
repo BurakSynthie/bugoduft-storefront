@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BUGO DUFT — Yönetim (Vorschau)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>/* =====================================================================
+   BUGO DUFT — global stylesheet (design tokens + component classes)
+   Single source of truth. Light-first, BUGO blue/black/white, German B2B.
+   Used by the Next app AND the static preview so they stay identical.
+   ===================================================================== */
+:root{
+  --c-blue:#1268E8; --c-blue-deep:#073A86; --c-ink:#101216; --c-graphite:#4F5661;
+  --c-gray:#F5F7FA; --c-border:#E4E8EE; --c-white:#FFFFFF; --c-dark:#090B0F;
+  --bg:var(--c-white); --bg-subtle:var(--c-gray); --bg-dark:var(--c-dark);
+  --fg:var(--c-ink); --fg-muted:var(--c-graphite); --fg-on-dark:#EDF1F7;
+  --accent:var(--c-blue); --accent-strong:var(--c-blue-deep); --border:var(--c-border);
+  --ok:#157F4B; --warn:#B4690E; --danger:#C0362C;
+  --font-sans:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --t-hero:clamp(2.5rem,5.5vw,4.75rem); --t-h2:clamp(1.6rem,2.6vw,2.25rem);
+  --t-h3:clamp(1.2rem,1.8vw,1.5rem); --t-eyebrow:.78rem;
+  --s-1:.25rem; --s-2:.5rem; --s-3:.75rem; --s-4:1rem; --s-5:1.5rem; --s-6:2rem;
+  --s-8:3rem; --s-10:4rem; --s-12:6rem; --s-16:8rem;
+  --r-btn:11px; --r-input:11px; --r-card:16px; --r-visual:22px; --r-full:999px;
+  --shadow-sm:0 1px 2px rgba(16,18,22,.05); --shadow-md:0 6px 20px rgba(16,18,22,.08);
+  --shadow-lg:0 18px 50px rgba(16,18,22,.12);
+  --e:cubic-bezier(.2,0,0,1); --container:1200px; --gutter:clamp(1rem,4vw,2.5rem);
+  --z-header:100; --z-drawer:200; --z-modal:300; --z-toast:400;
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);
+  font-size:1rem;line-height:1.6;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+h1,h2,h3,h4{line-height:1.12;letter-spacing:-.02em;margin:0;color:var(--fg);font-weight:600}
+p{margin:0}
+a{color:inherit;text-decoration:none}
+img{max-width:100%;height:auto;display:block}
+:where(a,button,input,select,textarea,[tabindex]):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important;scroll-behavior:auto!important}}
+
+/* layout */
+.container{max-width:var(--container);margin-inline:auto;padding-inline:var(--gutter)}
+.section{padding-block:clamp(3rem,7vw,6rem)}
+.section--tight{padding-block:clamp(2rem,4vw,3.5rem)}
+.section--dark{background:var(--bg-dark);color:var(--fg-on-dark)}
+.section--subtle{background:var(--bg-subtle)}
+.eyebrow{font-size:var(--t-eyebrow);font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--accent);display:inline-flex;align-items:center;gap:.55rem}
+.eyebrow::before{content:"";width:26px;height:2px;background:var(--accent);display:inline-block}
+.section--dark .eyebrow{color:#6FA8FF}.section--dark .eyebrow::before{background:#6FA8FF}
+.h2{font-size:var(--t-h2);font-weight:600;max-width:22ch}
+.lede{color:var(--fg-muted);max-width:56ch;margin-top:var(--s-4);font-size:1.05rem}
+.section--dark .lede{color:#AEB8C6}
+.grid{display:grid;gap:var(--s-5)}
+@media(min-width:640px){.grid-2{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:900px){.grid-3{grid-template-columns:repeat(3,1fr)}.grid-4{grid-template-columns:repeat(4,1fr)}}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;font-weight:600;
+  font-size:.95rem;padding:.8rem 1.35rem;border-radius:var(--r-btn);border:1px solid transparent;
+  cursor:pointer;transition:transform .15s var(--e),background .15s var(--e),box-shadow .15s var(--e);
+  white-space:nowrap;line-height:1}
+.btn:active{transform:translateY(1px)}
+.btn--primary{background:var(--accent);color:#fff}
+.btn--primary:hover{background:var(--accent-strong)}
+.btn--ghost{background:transparent;color:var(--fg);border-color:var(--border)}
+.btn--ghost:hover{border-color:var(--fg);}
+.btn--dark{background:var(--c-ink);color:#fff}.btn--dark:hover{background:#000}
+.btn--on-dark{background:#fff;color:var(--c-ink)}
+.btn--lg{padding:1rem 1.7rem;font-size:1rem}
+.btn--block{width:100%}
+
+/* header */
+.ann{background:var(--c-ink);color:#fff;font-size:.82rem;text-align:center;padding:.5rem var(--gutter)}
+.ann a{color:#8FB8FF;font-weight:600}
+.header{position:sticky;top:0;z-index:var(--z-header);background:rgba(255,255,255,.9);
+  backdrop-filter:saturate(160%) blur(10px);border-bottom:1px solid transparent;transition:border-color .2s,box-shadow .2s,padding .2s}
+.header--scrolled{border-color:var(--border);box-shadow:var(--shadow-sm)}
+.header__inner{display:flex;align-items:center;gap:var(--s-6);height:68px}
+.header--scrolled .header__inner{height:58px}
+.logo{font-weight:700;letter-spacing:-.03em;font-size:1.2rem;display:inline-flex;align-items:center;gap:.5rem}
+.logo__mark{width:26px;height:26px;border-radius:7px;background:var(--accent);position:relative;flex:none}
+.logo__mark::after{content:"";position:absolute;inset:7px;border:2px solid #fff;border-radius:3px}
+.nav{display:none;gap:var(--s-5);margin-inline:auto}
+.nav a{font-size:.92rem;color:var(--fg-muted);font-weight:500;padding:.3rem 0;position:relative}
+.nav a:hover{color:var(--fg)}
+.nav a::after{content:"";position:absolute;left:0;right:100%;bottom:-2px;height:2px;background:var(--accent);transition:right .2s var(--e)}
+.nav a:hover::after{right:0}
+.header__actions{display:flex;align-items:center;gap:var(--s-3);margin-left:auto}
+.iconbtn{width:40px;height:40px;border-radius:var(--r-btn);border:1px solid var(--border);background:#fff;
+  display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--fg)}
+.iconbtn:hover{border-color:var(--fg)}
+.switch{display:inline-flex;border:1px solid var(--border);border-radius:var(--r-btn);overflow:hidden;font-size:.82rem;font-weight:600}
+.switch button{padding:.45rem .6rem;background:#fff;border:0;cursor:pointer;color:var(--fg-muted)}
+.switch button[aria-current="true"]{background:var(--c-gray);color:var(--fg)}
+.burger{display:inline-flex}
+@media(min-width:1024px){.nav{display:flex}.burger{display:none}}
+
+/* hero */
+.hero{position:relative;overflow:hidden}
+.hero__grid{display:grid;gap:var(--s-8);align-items:center}
+@media(min-width:960px){.hero__grid{grid-template-columns:1.05fr .95fr}}
+.hero h1{font-size:var(--t-hero);font-weight:700;letter-spacing:-.035em}
+.hero h1 .accent{color:var(--accent)}
+.hero__sub{margin-top:var(--s-5);color:var(--fg-muted);font-size:1.1rem;max-width:46ch}
+.hero__cta{margin-top:var(--s-6);display:flex;gap:var(--s-3);flex-wrap:wrap}
+.hero__points{margin-top:var(--s-6);display:flex;flex-wrap:wrap;gap:var(--s-2) var(--s-5);color:var(--fg-muted);font-size:.9rem}
+.hero__points span{display:inline-flex;align-items:center;gap:.4rem}
+.hero__visual{position:relative;aspect-ratio:4/5;border-radius:var(--r-visual);
+  background:linear-gradient(160deg,#EAF1FC,#D7E6FB 60%,#C9DDF9);border:1px solid var(--border);
+  box-shadow:var(--shadow-lg);overflow:hidden}
+/* precision-grid signature motif (manufacturing competence) */
+.hero__visual::before{content:"";position:absolute;inset:0;background-image:
+  linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:34px 34px;opacity:.5;mask-image:radial-gradient(120% 90% at 70% 30%,#000 40%,transparent 80%)}
+.hero__tag{position:absolute;left:8%;top:14%;width:56%;aspect-ratio:5/7;border-radius:16px;background:#fff;
+  box-shadow:var(--shadow-md);border:1px solid var(--border);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:.4rem;transform:rotate(-4deg)}
+.hero__tag::before{content:"";width:8px;height:8px;border-radius:50%;border:2px solid var(--c-ink);position:absolute;top:8%}
+.hero__tag b{font-size:1.4rem;letter-spacing:-.02em}
+.hero__tag small{color:var(--fg-muted);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase}
+
+/* cards */
+.card{background:#fff;border:1px solid var(--border);border-radius:var(--r-card);overflow:hidden;
+  transition:transform .22s var(--e),box-shadow .22s var(--e),border-color .22s var(--e)}
+.card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);border-color:#D2DAE6}
+.ccard__media{aspect-ratio:4/3;background:linear-gradient(150deg,#EAF1FC,#D2E2FA);position:relative}
+.ccard__media[data-c="PREMIUM"]{background:linear-gradient(150deg,#E7EEF9,#C7D8F2)}
+.ccard__media[data-c="DELUXE"]{background:linear-gradient(150deg,#E9EAEE,#CDD3DE)}
+.ccard__media[data-c="VIP"]{background:linear-gradient(150deg,#0E1B33,#24406F)}
+.ccard__body{padding:var(--s-5)}
+.ccard__row{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s-3)}
+.ccard h3{font-size:1.15rem}
+.price{font-weight:700;font-size:1.05rem;letter-spacing:-.01em}
+.price small{display:block;font-weight:500;font-size:.72rem;color:var(--fg-muted);letter-spacing:.02em}
+.badge{display:inline-flex;align-items:center;gap:.35rem;font-size:.72rem;font-weight:600;
+  padding:.25rem .55rem;border-radius:var(--r-full);background:var(--c-gray);color:var(--fg-muted)}
+.badge--accent{background:#E7F0FE;color:var(--accent-strong)}
+
+/* steps / timeline */
+.steps{counter-reset:s;display:grid;gap:var(--s-5)}
+@media(min-width:900px){.steps--4{grid-template-columns:repeat(4,1fr)}}
+.step{position:relative;padding-top:var(--s-6)}
+.step__n{font-variant-numeric:tabular-nums;font-weight:700;color:var(--accent);font-size:.9rem;letter-spacing:.1em}
+.step h3{font-size:1.05rem;margin-top:.4rem}
+.step p{color:var(--fg-muted);margin-top:.3rem;font-size:.92rem}
+.timeline{display:grid;gap:0}
+.tl{display:grid;grid-template-columns:auto 1fr;gap:var(--s-4);padding:var(--s-4) 0;border-top:1px solid var(--border)}
+.tl__dot{width:14px;height:14px;border-radius:50%;border:3px solid var(--accent);margin-top:.35rem}
+.tl b{font-weight:600}.tl span{color:var(--fg-muted);font-size:.92rem}
+
+/* chips / scents */
+.chips{display:flex;flex-wrap:wrap;gap:var(--s-2)}
+.chip{border:1px solid var(--border);background:#fff;border-radius:var(--r-full);padding:.5rem .9rem;
+  font-size:.88rem;font-weight:500;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--c-ink);color:#fff;border-color:var(--c-ink)}
+.scentgrid{display:grid;gap:var(--s-3);grid-template-columns:repeat(2,1fr)}
+@media(min-width:720px){.scentgrid{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:1000px){.scentgrid{grid-template-columns:repeat(4,1fr)}}
+.scent{border:1px solid var(--border);border-radius:var(--r-card);padding:var(--s-4);background:#fff}
+.scent b{font-weight:600}.scent small{color:var(--fg-muted);display:block;margin-top:.15rem}
+
+/* faq */
+.faq{border-top:1px solid var(--border)}
+.faq details{border-bottom:1px solid var(--border)}
+.faq summary{cursor:pointer;list-style:none;padding:var(--s-4) 0;font-weight:600;display:flex;justify-content:space-between;gap:1rem}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";color:var(--accent);font-weight:700}
+.faq details[open] summary::after{content:"–"}
+.faq p{color:var(--fg-muted);padding-bottom:var(--s-4);max-width:70ch}
+
+/* forms */
+.field{display:flex;flex-direction:column;gap:.35rem;margin-bottom:var(--s-4)}
+.field label{font-size:.85rem;font-weight:600}
+.input,.select,.textarea{border:1px solid var(--border);border-radius:var(--r-input);padding:.75rem .85rem;
+  font:inherit;background:#fff;color:var(--fg)}
+.input:focus,.select:focus,.textarea:focus{border-color:var(--accent)}
+
+/* footer */
+.footer{background:var(--c-ink);color:#C7CEDA;padding-block:var(--s-10) var(--s-6)}
+.footer a{color:#C7CEDA}.footer a:hover{color:#fff}
+.footer__cols{display:grid;gap:var(--s-6);grid-template-columns:repeat(2,1fr)}
+@media(min-width:900px){.footer__cols{grid-template-columns:1.4fr repeat(4,1fr)}}
+.footer h4{color:#fff;font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;margin-bottom:var(--s-3)}
+.footer ul{list-style:none;padding:0;margin:0;display:grid;gap:.5rem;font-size:.9rem}
+.footer__bottom{border-top:1px solid #23262E;margin-top:var(--s-8);padding-top:var(--s-5);
+  display:flex;flex-wrap:wrap;gap:var(--s-3);justify-content:space-between;font-size:.82rem;color:#8B93A2}
+
+/* mobile bottom nav */
+.mobnav{position:fixed;left:0;right:0;bottom:0;z-index:var(--z-header);background:rgba(255,255,255,.94);
+  backdrop-filter:blur(10px);border-top:1px solid var(--border);
+  display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:var(--safe-bottom)}
+.mobnav a{display:flex;flex-direction:column;align-items:center;gap:.2rem;padding:.5rem 0;font-size:.66rem;color:var(--fg-muted)}
+.mobnav a b{width:22px;height:22px;display:grid;place-items:center}
+.mobnav .central{transform:translateY(-14px)}
+.mobnav .central b{width:52px;height:52px;border-radius:16px;background:var(--accent);color:#fff;box-shadow:var(--shadow-md)}
+.mobnav .central{color:var(--accent);font-weight:700}
+@media(min-width:1024px){.mobnav{display:none}}
+
+/* cookie bar */
+.cookie{position:fixed;left:var(--gutter);right:var(--gutter);bottom:calc(var(--s-4) + var(--safe-bottom));
+  z-index:var(--z-modal);max-width:520px;margin-inline:auto;background:#fff;border:1px solid var(--border);
+  border-radius:var(--r-card);box-shadow:var(--shadow-lg);padding:var(--s-5)}
+.cookie p{font-size:.88rem;color:var(--fg-muted)}
+.cookie__row{display:flex;gap:var(--s-2);flex-wrap:wrap;margin-top:var(--s-4)}
+
+/* reveal animation (transform/opacity only) */
+.reveal{opacity:0;transform:translateY(14px);transition:opacity .5s var(--e),transform .5s var(--e)}
+.reveal.in{opacity:1;transform:none}
+
+/* utilities */
+.muted{color:var(--fg-muted)}.center{text-align:center}
+.stack-6>*+*{margin-top:var(--s-6)}
+.mt-8{margin-top:var(--s-8)}.mt-6{margin-top:var(--s-6)}.mt-4{margin-top:var(--s-4)}
+.hide-mobile{display:none}@media(min-width:1024px){.hide-mobile{display:initial}}
+.pb-mobnav{padding-bottom:84px}@media(min-width:1024px){.pb-mobnav{padding-bottom:0}}
+/* Admin UI (Turkish). Reuses design tokens from globals.css, own component layer. */
+.adm{min-height:100vh;display:grid;grid-template-columns:248px 1fr;background:var(--c-gray)}
+.adm__side{background:var(--c-ink);color:#C7CEDA;padding:var(--s-5) var(--s-4);position:sticky;top:0;height:100vh;overflow:auto}
+.adm__brand{color:#fff;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:.5rem;margin-bottom:var(--s-6)}
+.adm__brand .logo__mark{width:24px;height:24px}
+.adm__navlabel{font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:#69707E;margin:var(--s-5) 0 var(--s-2)}
+.adm__nav a{display:block;padding:.55rem .7rem;border-radius:9px;color:#C7CEDA;font-size:.9rem;font-weight:500}
+.adm__nav a:hover{background:#1B1E25;color:#fff}
+.adm__nav a[aria-current="page"]{background:var(--c-blue);color:#fff}
+.adm__main{padding:var(--s-6) clamp(1rem,3vw,2.5rem);min-width:0}
+.adm__top{display:flex;align-items:center;justify-content:space-between;gap:var(--s-4);margin-bottom:var(--s-6)}
+.adm__top h1{font-size:1.4rem}
+.adm__crumb{font-size:.82rem;color:var(--fg-muted)}
+.adm-cards{display:grid;gap:var(--s-4);grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.adm-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:var(--s-5)}
+.adm-card .k{font-size:.8rem;color:var(--fg-muted)}
+.adm-card .v{font-size:1.7rem;font-weight:700;letter-spacing:-.02em;margin-top:.25rem}
+.adm-card .v.muted{color:var(--fg-muted);font-weight:600;font-size:1.1rem}
+.adm-note{background:#FFF7ED;border:1px solid #F4D9B0;color:#8A5A12;border-radius:12px;padding:.85rem 1rem;font-size:.88rem;display:flex;gap:.6rem;align-items:flex-start}
+.adm-panel{background:#fff;border:1px solid var(--border);border-radius:14px;padding:var(--s-5);margin-top:var(--s-5)}
+.adm-table{width:100%;border-collapse:collapse;font-size:.9rem}
+.adm-table th,.adm-table td{text-align:left;padding:.7rem .6rem;border-bottom:1px solid var(--border)}
+.adm-table th{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-muted)}
+.adm-tag{display:inline-flex;padding:.15rem .5rem;border-radius:999px;font-size:.72rem;font-weight:600;background:#E7F0FE;color:#0A57C2}
+.adm-tag--off{background:#F1F2F4;color:#6B7280}
+.adm-tabs{display:flex;gap:.35rem;border-bottom:1px solid var(--border);margin-bottom:var(--s-5)}
+.adm-tab{padding:.6rem .9rem;border:0;background:none;font:inherit;font-weight:600;color:var(--fg-muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.adm-tab[aria-selected="true"]{color:var(--c-blue);border-bottom-color:var(--c-blue)}
+.adm-grid2{display:grid;gap:var(--s-4)}@media(min-width:820px){.adm-grid2{grid-template-columns:1fr 1fr}}
+.adm-btn{display:inline-flex;align-items:center;gap:.4rem;padding:.6rem 1rem;border-radius:10px;font-weight:600;font-size:.9rem;border:1px solid var(--border);background:#fff;cursor:pointer}
+.adm-btn--primary{background:var(--c-blue);color:#fff;border-color:var(--c-blue)}
+.adm-btn--ghost:hover{border-color:var(--fg)}
+
+.adm__side{position:static;height:auto;min-height:100vh}
+@media(max-width:760px){.adm{grid-template-columns:1fr}}
+</style></head>
+<body><div class="adm"><aside class="adm__side">
+  <div class="adm__brand"><span class="logo__mark"></span>BUGO DUFT</div>
+  <nav class="adm__nav">
+    <div class="adm__navlabel">Genel</div><a href="#" data-v="panel" class="jn">Panel</a>
+    <div class="adm__navlabel">Katalog</div><a href="#" data-v="urunler" class="jn">Ürünler</a><a href="#" data-v="duzenle" class="jn">Ürün düzenle</a><a href="#">Koleksiyonlar</a><a href="#">Kokular</a>
+    <div class="adm__navlabel">İçerik</div><a href="#">Ana sayfa</a><a href="#">Çeviriler</a><a href="#">SEO</a>
+    <div class="adm__navlabel">Operasyon</div><a href="#">Siparişler</a><a href="#">Teklifler</a><a href="#">Ayarlar</a>
+  </nav></aside><main class="adm__main"><section class="view" data-view="panel">
+  <div class="adm__top"><div><h1>Panel</h1><div class="adm__crumb">Genel bakış</div></div></div>
+  <div class="adm-note"><span>ⓘ</span><span>Veritabanı ve entegrasyonlar (ödeme, e-posta, fatura, kargo, çeviri, analitik) henüz yapılandırılmadı. Kartlar gerçek veriye bağlanınca otomatik dolacaktır — sahte veri gösterilmez.</span></div>
+  <div class="adm-cards" style="margin-top:var(--s-5)">
+    <div class="adm-card"><div class="k">Bekleyen siparişler</div><div class="v muted">Bağlı değil</div></div>
+    <div class="adm-card"><div class="k">Tasarım onayı bekleyen</div><div class="v muted">Bağlı değil</div></div>
+    <div class="adm-card"><div class="k">Açık teklifler</div><div class="v muted">Bağlı değil</div></div>
+    <div class="adm-card"><div class="k">Bu ay ciro</div><div class="v muted">Bağlı değil</div></div>
+  </div>
+  <div class="adm-panel"><strong>Entegrasyon durumu</strong>
+    <table class="adm-table" style="margin-top:var(--s-4)"><thead><tr><th>Servis</th><th>Durum</th></tr></thead><tbody>
+    <tr><td>Ödeme (Shopier)</td><td><span class="adm-tag adm-tag--off">Yapılandırılmadı</span></td></tr>
+    <tr><td>E-posta</td><td><span class="adm-tag adm-tag--off">Yapılandırılmadı</span></td></tr>
+    <tr><td>Fatura</td><td><span class="adm-tag adm-tag--off">Yapılandırılmadı</span></td></tr>
+    <tr><td>Kargo</td><td><span class="adm-tag adm-tag--off">Yapılandırılmadı</span></td></tr>
+    <tr><td>Çeviri servisi</td><td><span class="adm-tag adm-tag--off">Yapılandırılmadı</span></td></tr>
+    <tr><td>Analitik</td><td><span class="adm-tag adm-tag--off">Yapılandırılmadı</span></td></tr>
+    <tr><td>Supabase</td><td><span class="adm-tag adm-tag--off">Yapılandırılmadı</span></td></tr>
+    </tbody></table></div>
+</section><section class="view" data-view="urunler" style="display:none">
+  <div class="adm__top"><div><h1>Ürünler</h1><div class="adm__crumb">Katalog / Ürünler</div></div><button class="adm-btn adm-btn--primary">+ Yeni ürün</button></div>
+  <div class="adm-panel"><table class="adm-table"><thead><tr><th>Ürün (DE)</th><th>Kod</th><th>Koleksiyon</th><th>Başlangıç fiyatı</th><th>Durum</th><th></th></tr></thead><tbody>
+  <tr><td>Standard Duftanhänger</td><td>BUGO-STD</td><td>STANDARD</td><td>269,00 €</td><td><span class="adm-tag">Yayında</span></td><td style="text-align:right"><a class="adm-btn adm-btn--ghost jn" data-v="duzenle" href="#">Düzenle</a></td></tr>
+  <tr><td>Premium Duftanhänger</td><td>BUGO-PRM</td><td>PREMIUM</td><td>279,00 €</td><td><span class="adm-tag">Yayında</span></td><td style="text-align:right"><a class="adm-btn adm-btn--ghost jn" data-v="duzenle" href="#">Düzenle</a></td></tr>
+  <tr><td>Deluxe Duftanhänger</td><td>BUGO-DLX</td><td>DELUXE</td><td>289,00 €</td><td><span class="adm-tag">Yayında</span></td><td style="text-align:right"><a class="adm-btn adm-btn--ghost jn" data-v="duzenle" href="#">Düzenle</a></td></tr>
+  <tr><td>VIP Duftanhänger</td><td>BUGO-VIP</td><td>VIP</td><td>320,00 €</td><td><span class="adm-tag">Yayında</span></td><td style="text-align:right"><a class="adm-btn adm-btn--ghost jn" data-v="duzenle" href="#">Düzenle</a></td></tr>
+  </tbody></table></div>
+</section><section class="view" data-view="duzenle" style="display:none">
+  <div class="adm__top"><div><h1>Standard Duftanhänger</h1><div class="adm__crumb">Katalog / Ürünler / BUGO-STD</div></div>
+    <div style="display:flex;gap:.5rem"><button class="adm-btn adm-btn--ghost" id="btnTr">DİĞER DİLLERE OTOMATİK ÇEVİR</button><button class="adm-btn adm-btn--primary" id="btnSave">Kaydet</button></div></div>
+  <div class="adm-note" id="admMsg" style="display:none;margin-bottom:var(--s-5)"><span>ⓘ</span><span id="admMsgTxt"></span></div>
+  <div class="adm-panel"><strong>Temel bilgiler (dilden bağımsız)</strong>
+    <div class="adm-grid2" style="margin-top:var(--s-4)">
+      <div class="field"><label>Ürün kodu</label><input class="input" value="BUGO-STD"></div>
+      <div class="field"><label>Koleksiyon</label><input class="input" value="STANDARD"></div>
+      <div class="field"><label>Başlangıç fiyatı</label><div style="position:relative"><input class="input" style="padding-right:2rem" value="269,00"><span style="position:absolute;right:.7rem;top:50%;transform:translateY(-50%);color:var(--fg-muted)">€</span></div></div>
+      <div class="field"><label>Para birimi</label><input class="input" value="EUR" readonly></div>
+    </div>
+    <div class="adm-grid2">
+      <div class="field"><label>Min. adet</label><input class="input" value="1000" inputmode="numeric"></div>
+      <div class="field"><label>Adım (artış)</label><input class="input" value="1000" inputmode="numeric"></div>
+      <div class="field"><label>Max. adet</label><input class="input" value="100000" inputmode="numeric"></div>
+    </div></div>
+  <div class="adm-panel"><strong>Staffelpreise (kademeli fiyatlar)</strong>
+    <table class="adm-table" style="margin-top:var(--s-4)"><thead><tr><th>Min. adet</th><th>Birim fiyat</th></tr></thead><tbody>
+    <tr><td style="width:40%">1000</td><td><div style="position:relative"><input class="input" style="padding-right:2rem" value="269,00"><span style="position:absolute;right:.7rem;top:50%;transform:translateY(-50%);color:var(--fg-muted)">€</span></div></td></tr>
+    </tbody></table></div>
+  <div class="adm-panel"><strong>Seçenek fiyat farkları</strong>
+    <table class="adm-table" style="margin-top:var(--s-4)"><thead><tr><th>Seçenek</th><th>Fiyat farkı</th></tr></thead><tbody>
+    <tr><td style="width:55%">Intensivduft</td><td><div style="position:relative"><input class="input" style="padding-right:2rem" value="30,00"><span style="position:absolute;right:.7rem;top:50%;transform:translateY(-50%);color:var(--fg-muted)">€</span></div></td></tr>
+    </tbody></table></div>
+  <div class="adm-panel">
+    <div class="adm-tabs" role="tablist">
+      <button class="adm-tab jt" data-tab="de" aria-selected="true">Almanca (kaynak)</button>
+      <button class="adm-tab jt" data-tab="en" aria-selected="false">İngilizce</button>
+      <button class="adm-tab jt" data-tab="fr" aria-selected="false">Fransızca</button>
+    </div>
+    <div class="tabpanel" data-tab="de" style="display:block">
+      <div class="adm-grid2">
+        <div class="field"><label>Ürün adı (DE)</label><input class="input" value="Standard Duftanhänger"></div>
+        <div class="field"><label>URL slug (DE)</label><input class="input" value="standard-duftanhaenger"></div>
+      </div>
+      <div class="field"><label>H1</label><input class="input" value="Standard Duftanhänger individuell bedrucken"></div>
+      <div class="field"><label>Kısa açıklama</label><textarea class="textarea" rows="2">Der bewährte Werbeduftanhänger – Ihr Logo, Ihr Duft, ab 1.000 Stück.</textarea></div>
+      <div class="field"><label>Uzun açıklama</label><textarea class="textarea" rows="4">Individuell bedruckte Standard-Werbeduftanhänger für Autohäuser, Werkstätten und Dienstleister.</textarea></div>
+      <div style="border-top:1px solid var(--border);margin:var(--s-4) 0;padding-top:var(--s-4)"><strong style="font-size:.9rem">SEO (DE)</strong></div>
+      <div class="field"><label>SEO başlığı</label><input class="input" value="Standard Duftanhänger bedrucken lassen | BUGO DUFT"></div>
+      <div class="field"><label>SEO açıklaması</label><textarea class="textarea" rows="2">Standard-Werbeduftanhänger individuell mit Logo bedrucken. Ab 1.000 Stück, ~20 Düfte, Preis ab 269 €.</textarea></div>
+      <p class="muted" style="font-size:.82rem">Bu alanlar her dil için ayrı satır olarak saklanır. Canonical, hreflang ve site haritası bu slug’lardan üretilir.</p>
+    </div><div class="tabpanel" data-tab="en" style="display:none">
+      <div class="adm-grid2">
+        <div class="field"><label>Ürün adı (EN)</label><input class="input" value="Standard Air Freshener"></div>
+        <div class="field"><label>URL slug (EN)</label><input class="input" value="custom-air-freshener-standard"></div>
+      </div>
+      <div class="field"><label>H1</label><input class="input" value="Custom-printed standard air fresheners"></div>
+      <div class="field"><label>Kısa açıklama</label><textarea class="textarea" rows="2">The proven promotional air freshener – your logo, your scent, from 1,000 units.</textarea></div>
+      <div class="field"><label>Uzun açıklama</label><textarea class="textarea" rows="4">Custom-printed standard promotional air fresheners for dealerships, workshops and service businesses.</textarea></div>
+      <div style="border-top:1px solid var(--border);margin:var(--s-4) 0;padding-top:var(--s-4)"><strong style="font-size:.9rem">SEO (EN)</strong></div>
+      <div class="field"><label>SEO başlığı</label><input class="input" value="Custom Standard Air Fresheners with Logo | BUGO DUFT"></div>
+      <div class="field"><label>SEO açıklaması</label><textarea class="textarea" rows="2">Standard promotional air fresheners printed with your logo. From 1,000 units, ~20 scents, price from €269.</textarea></div>
+      <p class="muted" style="font-size:.82rem">Bu alanlar her dil için ayrı satır olarak saklanır. Canonical, hreflang ve site haritası bu slug’lardan üretilir.</p>
+    </div><div class="tabpanel" data-tab="fr" style="display:none">
+      <div class="adm-grid2">
+        <div class="field"><label>Ürün adı (FR)</label><input class="input" value="Désodorisant Standard"></div>
+        <div class="field"><label>URL slug (FR)</label><input class="input" value="desodorisant-personnalise-standard"></div>
+      </div>
+      <div class="field"><label>H1</label><input class="input" value="Désodorisants standard personnalisés"></div>
+      <div class="field"><label>Kısa açıklama</label><textarea class="textarea" rows="2">Le désodorisant publicitaire éprouvé – votre logo, votre parfum, dès 1 000 pièces.</textarea></div>
+      <div class="field"><label>Uzun açıklama</label><textarea class="textarea" rows="4">Désodorisants publicitaires standard personnalisés pour concessionnaires, garages et prestataires.</textarea></div>
+      <div style="border-top:1px solid var(--border);margin:var(--s-4) 0;padding-top:var(--s-4)"><strong style="font-size:.9rem">SEO (FR)</strong></div>
+      <div class="field"><label>SEO başlığı</label><input class="input" value="Désodorisants Standard personnalisés avec logo | BUGO DUFT"></div>
+      <div class="field"><label>SEO açıklaması</label><textarea class="textarea" rows="2">Désodorisants publicitaires standard imprimés avec votre logo. Dès 1 000 pièces, ~20 parfums, à partir de 269 €.</textarea></div>
+      <p class="muted" style="font-size:.82rem">Bu alanlar her dil için ayrı satır olarak saklanır. Canonical, hreflang ve site haritası bu slug’lardan üretilir.</p>
+    </div>
+  </div>
+</section></main></div>
+<script>
+function show(v){document.querySelectorAll('.view').forEach(function(s){s.style.display=(s.dataset.view===v)?'block':'none'});}
+document.querySelectorAll('.jn').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault();show(a.dataset.v);});});
+document.querySelectorAll('.jt').forEach(function(t){t.addEventListener('click',function(){
+  document.querySelectorAll('.jt').forEach(function(x){x.setAttribute('aria-selected','false')});
+  t.setAttribute('aria-selected','true');
+  document.querySelectorAll('.tabpanel').forEach(function(p){p.style.display=(p.dataset.tab===t.dataset.tab)?'block':'none'});
+});});
+function msg(txt){var m=document.getElementById('admMsg');document.getElementById('admMsgTxt').textContent=txt;m.style.display='flex';}
+document.getElementById('btnTr').addEventListener('click',function(){msg('Çeviri servisi yapılandırılmadı. Diğer dillere otomatik çeviri, çeviri sağlayıcısı bağlandığında etkinleşecektir.');});
+document.getElementById('btnSave').addEventListener('click',function(){msg('Kaydetme, veritabanı (Supabase) bağlandığında etkinleşir. Şu an değişiklikler kalıcı değildir.');});
+</script>
+</body></html>

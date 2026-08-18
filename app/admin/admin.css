@@ -1,0 +1,154 @@
+/* Admin UI (Turkish). Reuses design tokens from globals.css, own component layer. */
+.adm{min-height:100vh;display:grid;grid-template-columns:248px 1fr;background:var(--c-gray)}
+.adm__side{background:var(--c-ink);color:#C7CEDA;padding:var(--s-5) var(--s-4);position:sticky;top:0;height:100vh;overflow:auto}
+.adm__brand{color:#fff;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:.5rem;margin-bottom:var(--s-6)}
+.adm__brand .logo__mark{width:24px;height:24px}
+.adm__navlabel{font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:#69707E;margin:var(--s-5) 0 var(--s-2)}
+.adm__nav a{display:block;padding:.55rem .7rem;border-radius:9px;color:#C7CEDA;font-size:.9rem;font-weight:500}
+.adm__nav a:hover{background:#1B1E25;color:#fff}
+.adm__nav a[aria-current="page"]{background:var(--c-blue);color:#fff}
+.adm__main{padding:var(--s-6) clamp(1rem,3vw,2.5rem);min-width:0}
+.adm__top{display:flex;align-items:center;justify-content:space-between;gap:var(--s-4);margin-bottom:var(--s-6)}
+.adm__top h1{font-size:1.4rem}
+.adm__crumb{font-size:.82rem;color:var(--fg-muted)}
+.adm-cards{display:grid;gap:var(--s-4);grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.adm-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:var(--s-5)}
+.adm-card .k{font-size:.8rem;color:var(--fg-muted)}
+.adm-card .v{font-size:1.7rem;font-weight:700;letter-spacing:-.02em;margin-top:.25rem}
+.adm-card .v.muted{color:var(--fg-muted);font-weight:600;font-size:1.1rem}
+.adm-note{background:#FFF7ED;border:1px solid #F4D9B0;color:#8A5A12;border-radius:12px;padding:.85rem 1rem;font-size:.88rem;display:flex;gap:.6rem;align-items:flex-start}
+.adm-panel{background:#fff;border:1px solid var(--border);border-radius:14px;padding:var(--s-5);margin-top:var(--s-5)}
+.adm-table{width:100%;border-collapse:collapse;font-size:.9rem}
+.adm-table th,.adm-table td{text-align:left;padding:.7rem .6rem;border-bottom:1px solid var(--border)}
+.adm-table th{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-muted)}
+.adm-tag{display:inline-flex;padding:.15rem .5rem;border-radius:999px;font-size:.72rem;font-weight:600;background:#E7F0FE;color:#0A57C2}
+.adm-tag--off{background:#F1F2F4;color:#6B7280}
+.adm-tabs{display:flex;gap:.35rem;border-bottom:1px solid var(--border);margin-bottom:var(--s-5)}
+.adm-tab{padding:.6rem .9rem;border:0;background:none;font:inherit;font-weight:600;color:var(--fg-muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.adm-tab[aria-selected="true"]{color:var(--c-blue);border-bottom-color:var(--c-blue)}
+.adm-grid2{display:grid;gap:var(--s-4)}@media(min-width:820px){.adm-grid2{grid-template-columns:1fr 1fr}}
+.adm-btn{display:inline-flex;align-items:center;gap:.4rem;padding:.6rem 1rem;border-radius:10px;font-weight:600;font-size:.9rem;border:1px solid var(--border);background:#fff;cursor:pointer}
+.adm-btn--primary{background:var(--c-blue);color:#fff;border-color:var(--c-blue)}
+.adm-btn--ghost:hover{border-color:var(--fg)}
+
+/* Phase 5 order status badges */
+.op{display:inline-flex;align-items:center;gap:.35rem;padding:.2rem .6rem;border-radius:999px;font-size:.74rem;font-weight:600}
+.op--received{background:#EAF1FC;color:#0A57C2}
+.op--design{background:#FFF3E0;color:#8A5A12}
+.op--production{background:#EDE7FB;color:#5B3FA6}
+.op--shipped{background:#E4F4EA;color:#157F4B}
+.adm-toolbar{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:var(--s-4);align-items:center}
+.adm-toolbar .input,.adm-toolbar .select{padding:.5rem .6rem}
+.adm-kv{display:grid;grid-template-columns:auto 1fr;gap:.4rem .9rem;font-size:.9rem}
+.adm-kv dt{color:var(--fg-muted)}.adm-kv dd{margin:0;font-weight:500}
+/* ---- responsive utilities ---- */
+.adm-hide-mobile{display:initial}
+.adm-cardlist{display:none}
+
+/* ============ ADMIN MOBILE SHELL (<=860px) ============ */
+.adm__mobtop,.adm__mobbottom,.adm__sheet{display:none}
+body.adm-lock{overflow:hidden}
+
+@media(max-width:860px){
+  html,body{overflow-x:hidden}
+  .adm{grid-template-columns:1fr;min-width:0}
+  .adm__side{display:none}                                   /* desktop sidebar hidden on mobile */
+  .adm__main{padding:calc(52px + env(safe-area-inset-top,0px) + var(--s-4)) var(--s-4)
+    calc(64px + env(safe-area-inset-bottom,0px) + var(--s-5));min-width:0;overflow-x:hidden}
+  .adm__top{flex-wrap:wrap;margin-bottom:var(--s-5)}
+  .adm__top h1{font-size:1.2rem}
+
+  /* fixed compact top bar */
+  .adm__mobtop{display:flex;align-items:center;justify-content:space-between;gap:.5rem;
+    position:fixed;top:0;left:0;right:0;z-index:60;height:calc(52px + env(safe-area-inset-top,0px));
+    padding:env(safe-area-inset-top,0px) var(--s-4) 0;background:var(--c-ink);color:#fff}
+  .adm__mobbrand{display:flex;align-items:center;gap:.45rem;font-weight:700;font-size:.95rem}
+  .adm__mobbrand .logo__mark{width:20px;height:20px}
+  .adm__mobtitle{font-size:.85rem;color:#AEB6C4}
+
+  /* fixed bottom nav (5 primary) */
+  .adm__mobbottom{display:grid;grid-template-columns:repeat(5,1fr);
+    position:fixed;left:0;right:0;bottom:0;z-index:60;background:rgba(255,255,255,.97);
+    backdrop-filter:blur(8px);border-top:1px solid var(--border);padding-bottom:env(safe-area-inset-bottom,0px)}
+  .adm__mobbottom a,.adm__mobbottom button{position:relative;display:flex;flex-direction:column;align-items:center;
+    gap:.2rem;padding:.55rem 0 .5rem;font-size:.66rem;font-weight:600;color:var(--fg-muted);background:none;border:0;
+    font-family:inherit;cursor:pointer;min-height:54px;justify-content:center}
+  .adm__mobbottom svg{width:22px;height:22px;display:block}
+  .adm__mobbottom a[aria-current="page"]{color:var(--c-blue)}
+  /* subtle active indicator (small top bar), not a big blue rectangle */
+  .adm__mobbottom a[aria-current="page"]::before{content:"";position:absolute;top:0;width:22px;height:2.5px;
+    border-radius:0 0 3px 3px;background:var(--c-blue)}
+
+  /* secondary-areas sheet */
+  .adm__sheet{display:block;position:fixed;inset:0;z-index:70;visibility:hidden;pointer-events:none}
+  .adm__sheet.is-open{visibility:visible;pointer-events:auto}
+  .adm__sheet-scrim{position:absolute;inset:0;background:rgba(16,18,22,.5);opacity:0;transition:opacity .2s ease}
+  .adm__sheet.is-open .adm__sheet-scrim{opacity:1}
+  .adm__sheet-panel{position:absolute;left:0;right:0;bottom:0;max-height:82vh;background:#fff;
+    border-radius:16px 16px 0 0;display:flex;flex-direction:column;transform:translateY(100%);
+    transition:transform .26s ease;padding-bottom:env(safe-area-inset-bottom,0px);outline:none}
+  .adm__sheet.is-open .adm__sheet-panel{transform:translateY(0)}
+  @media(prefers-reduced-motion:reduce){.adm__sheet-panel,.adm__sheet-scrim{transition:none}}
+  .adm__sheet-head{display:flex;align-items:center;justify-content:space-between;padding:var(--s-4) var(--s-5);border-bottom:1px solid var(--border)}
+  .adm__sheet-x{width:34px;height:34px;border-radius:9px;border:1px solid var(--border);background:#fff;font-size:1.3rem;line-height:1;cursor:pointer}
+  .adm__sheet-body{overflow-y:auto;padding:var(--s-4) var(--s-5) var(--s-5)}
+  .adm__sheet-group{margin-bottom:var(--s-4)}
+  .adm__sheet-label{font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-muted);font-weight:700;margin:.2rem 0 .35rem}
+  .adm__sheet-link{display:flex;align-items:center;justify-content:space-between;padding:.7rem .2rem;
+    border-bottom:1px solid var(--border);font-weight:500;color:var(--fg);text-decoration:none}
+  .adm__sheet-link[aria-current="page"]{color:var(--c-blue)}
+  .adm__sheet-link.is-soon{color:var(--fg-muted);cursor:default}
+  .adm__sheet-link.is-soon em{font-style:normal;font-size:.68rem;background:#F1F2F4;color:#6B7280;padding:.1rem .45rem;border-radius:999px}
+  .adm__sheet-foot{margin-top:var(--s-5);padding-top:var(--s-4);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:var(--s-4)}
+  .adm__sheet-email{font-size:.78rem;color:var(--fg-muted);overflow:hidden;text-overflow:ellipsis}
+
+  /* tables → cards on small screens */
+  .adm-hide-mobile{display:none!important}
+  .adm-cardlist{display:grid;gap:var(--s-3)}
+  .adm-panel{padding:var(--s-4)}
+  .adm-ucard{border:1px solid var(--border);border-radius:12px;padding:var(--s-4);display:grid;gap:.35rem}
+  .adm-ucard__row{display:flex;align-items:center;justify-content:space-between;gap:.6rem}
+  .adm-ucard__name{font-weight:700}
+  .adm-ucard__meta{font-size:.82rem;color:var(--fg-muted);display:flex;flex-wrap:wrap;gap:.15rem .6rem}
+  .adm-ucard__foot{display:flex;align-items:center;justify-content:space-between;margin-top:.4rem}
+  .adm-toolbar{gap:.4rem}
+  .adm-toolbar .input,.adm-toolbar .select{flex:1 1 46%;min-width:0}
+}
+
+/* ============ Phase 6B: media library + picker ============ */
+.media-upload{display:flex;align-items:center;gap:.8rem;margin-bottom:var(--s-5);flex-wrap:wrap}
+.adm-btn.is-disabled{opacity:.55;pointer-events:none}
+.media-grid{display:grid;gap:var(--s-4);grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.media-card{position:relative;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#fff;display:flex;flex-direction:column}
+.media-card__thumb{position:relative;aspect-ratio:1;background:var(--c-gray);display:grid;place-items:center;overflow:hidden}
+.media-card__thumb img,.media-card__thumb video{width:100%;height:100%;object-fit:cover;display:block}
+.media-card__type{position:absolute;top:.4rem;left:.4rem;font-size:.6rem;font-weight:700;letter-spacing:.06em;background:rgba(16,18,22,.72);color:#fff;padding:.1rem .4rem;border-radius:6px}
+.media-card figcaption{padding:.5rem .6rem;display:grid;gap:.1rem;min-width:0}
+.media-card__name{font-size:.78rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.media-card__del{position:absolute;top:.4rem;right:.4rem;background:rgba(255,255,255,.92);border:1px solid var(--border);border-radius:7px;font-size:.72rem;font-weight:600;padding:.2rem .5rem;cursor:pointer;color:#B42318}
+.media-card__blocked{position:absolute;inset:auto 0 0 0;background:#FEECEC;color:#B42318;font-size:.72rem;padding:.4rem .5rem;display:flex;flex-direction:column;gap:.2rem}
+
+/* picker modal */
+.mp{position:fixed;inset:0;z-index:80;display:grid;place-items:center}
+.mp__scrim{position:absolute;inset:0;background:rgba(16,18,22,.5)}
+.mp__panel{position:relative;width:min(760px,94vw);max-height:86vh;background:#fff;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow-lg)}
+.mp__head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:var(--s-4) var(--s-5);border-bottom:1px solid var(--border)}
+.mp__body{overflow-y:auto;padding:var(--s-4) var(--s-5)}
+.media-grid--pick{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
+.media-pick{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff;cursor:pointer;display:flex;flex-direction:column;padding:0}
+.media-pick img,.media-pick video{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+.media-pick:hover{border-color:var(--c-blue)}
+.media-pick__name{font-size:.72rem;padding:.35rem .4rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:860px){.media-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}}
+.media-slot{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff}
+.media-slot img,.media-slot video{width:100%;max-height:180px;object-fit:cover;display:block;background:var(--c-gray)}
+.media-slot__act{display:flex;justify-content:space-between;padding:.4rem .5rem;gap:.5rem}
+
+/* Phase 6D: quote detail definition list */
+.adm-dl{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.adm-dl>div{display:flex;flex-direction:column;gap:.1rem;min-width:0}
+.adm-dl dt{font-size:.72rem;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.04em}
+.adm-dl dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+@media(max-width:560px){.adm-dl{grid-template-columns:1fr}}
+
+.adm-stack{display:grid;gap:var(--s-5)}
