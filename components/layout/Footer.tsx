@@ -56,7 +56,7 @@ export default function Footer({ locale, dict, settings }: { locale: Locale; dic
             [navLabel('scents', dict.nav.scents), sectionPath('scents', locale)],
             [navLabel('industries', dict.nav.industries), sectionPath('industries', locale)],
             [navLabel('sample', locale==='de'?'Duftmuster':locale==='en'?'Fragrance Sample':'Échantillons'), sectionPath('sample', locale)],
-            [navLabel('production', dict.nav.production), `/${locale}#produktion`],
+            [navLabel('production', dict.nav.production), sectionPath('production', locale)],
           ])}
           {col(f.service, [
             [dict.nav.contact, `/${locale}#kontakt`],

@@ -61,6 +61,16 @@ export function organizationLd(opts?: { brand?: string; email?: string | null; l
   if (email) ld.contactPoint = [{ '@type':'ContactPoint', email, contactType:'customer service' }];
   return ld;
 }
+// §v1.2.6 A2 — WebSite entity for the homepage so search engines can identify the site name.
+// Exactly ONE WebSite entity is emitted (homepage only). Does not replace Organization schema;
+// both are emitted together on the homepage. name defaults to the current brand → 'BUGO DUFT';
+// url is the canonical site URL (https://bugoduft.de) from the central site config.
+export function websiteLd(opts?: { brand?: string }) {
+  return {
+    '@context': 'https://schema.org', '@type': 'WebSite',
+    name: opts?.brand || site.name, url: site.url,
+  };
+}
 export function productLd(p: { name:string; description:string; url:string; priceFromCents:number; currency:string; brand?:string; }) {
   return { '@context':'https://schema.org', '@type':'Product', name:p.name, description:p.description,
     brand:{ '@type':'Brand', name: p.brand || site.name },

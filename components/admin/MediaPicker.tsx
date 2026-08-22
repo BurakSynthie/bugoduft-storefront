@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import type { MediaRecord, MediaType } from '@/lib/media/types';
-import { listMediaAction, uploadMediaAction } from '@/lib/media/actions';
+import { listMediaAction } from '@/lib/media/actions';
+import { uploadMediaFile } from '@/lib/media/upload-client';
 
 // Reusable picker for product/homepage editors. Browse existing media (reuse, no
 // duplicate uploads) or upload new; returns the chosen record via onSelect.
@@ -29,8 +30,8 @@ export default function MediaPicker({ type, onSelect, onClose }:
   async function onFiles(files: FileList | null) {
     if (!files || !files.length) return;
     setBusy(true); setError(null);
-    const fd = new FormData(); fd.set('file', files[0]);
-    const res = await uploadMediaAction(fd);
+    // §v1.2.6-final2 direct-to-Supabase: bytes go browser → Storage, not through a Server Action.
+    const res = await uploadMediaFile(files[0]);
     if (res.ok) { setItems(prev => [res.data, ...prev]); onSelect(res.data); onClose(); }
     else setError(res.message);
     setBusy(false);

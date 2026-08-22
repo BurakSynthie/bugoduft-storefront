@@ -11,7 +11,7 @@ import DesignIncluded from '@/components/home/DesignIncluded';
 import { listCollections, listScents, listIndustries, homeAlternates } from '@/repositories/catalog';
 import { getScents as getScentsRead } from '@/repositories/catalog.read';
 import { getCollections } from '@/repositories/catalog.read';
-import { buildMetadata, organizationLd, faqLd } from '@/lib/seo';
+import { buildMetadata, organizationLd, faqLd, websiteLd } from '@/lib/seo';
 import JsonLd from '@/seo/JsonLd';
 import Hero from '@/components/home/Hero';
 import Scents from '@/components/home/Scents';
@@ -72,7 +72,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale:st
   }));
   return (
     <>
-      <JsonLd data={[organizationLd({
+      <JsonLd data={[websiteLd({ brand: settings.brandName || undefined }), organizationLd({
         brand: settings.brandName || undefined,
         email: settings.contact.service.email || settings.contact.email || null,
         logo: settings.brand.logo || null,

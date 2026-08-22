@@ -31,7 +31,7 @@ const slugPage = read('app/[locale]/[...slug]/page.tsx');
 ok('industry override matches i.key (not i.slug) — metadata + body', !/i\.slug === 'autohaeuser'/.test(slugPage) && /i\.key === 'autohaeuser'/.test(slugPage));
 ok('werkstatt override matches i.key', /i\.key === 'werkstaetten'/.test(slugPage));
 
-// ---------------- §3 About/B2B SEO wired; Sample H1/intro wired; Home no fake H1/intro; Production hidden -------
+// ---------------- §3 About/B2B SEO wired; Sample H1/intro wired; Home no fake H1/intro; Production managed -------
 const infoPage = read('app/[locale]/info/[slug]/page.tsx');
 ok('About/B2B use buildMetadata (brand-aware, auto canonical/hreflang)', /buildMetadata/.test(infoPage) && /SEO_INFO_SLUGS/.test(infoPage));
 ok('About/B2B consume seo.pages[key] title/description', /settings\.seo\.pages\[seoKey\]/.test(infoPage));
@@ -39,7 +39,12 @@ ok('Sample page receives admin H1/intro', /h1=\{spSeo\.h1\[locale\]/.test(slugPa
 const sampleC = read('components/storefront/SamplePage.tsx');
 ok('SamplePage renders admin h1/intro override', /h1 \|\| t\.title/.test(sampleC) && /intro \|\| t\.lede/.test(sampleC));
 const seoEditor = read('app/admin/(shell)/seo/SeoEditor.tsx');
-ok('SEO center excludes production (no real route)', /MANAGED_PAGES/.test(seoEditor) && !/'production'/.test(seoEditor.split('MANAGED_PAGES')[1].split(']')[0]));
+// §v1.2.6-final2: Production is now a real localized route (/de/produktion etc.) with an
+// existing settings.seo.pages.production model, so the SEO center MANAGES it (no longer hidden).
+ok('SEO center includes production as a managed page', /MANAGED_PAGES[^\n]*'production'/.test(seoEditor));
+ok('SEO center: Production exposes H1/intro (HAS_INTRO)', /HAS_INTRO[^\n]*'production'/.test(seoEditor));
+ok('Production page metadata overrides from settings.seo.pages.production', /pp\.title\[locale\] \|\| PRODUCTION_COPY\[locale\]\.title/.test(slugPage));
+ok('Production visible H1/intro override from settings.seo.pages.production', /pp\.h1\[locale\] \|\| PRODUCTION_COPY\[locale\]\.h1/.test(slugPage) && /ProductionLanding locale=\{locale\} h1=\{h1\} intro=\{intro\}/.test(slugPage));
 ok('SEO center: Home excluded from H1/intro (HAS_INTRO)', !/HAS_INTRO[^\n]*'home'/.test(seoEditor));
 ok('industry SEO single source: industryContent block drops seoTitle/seoDescription inputs', !/setInd\(k,'seoTitle'/.test(seoEditor) && !/setInd\(k,'seoDescription'/.test(seoEditor));
 

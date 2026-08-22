@@ -1,7 +1,8 @@
 'use client';
 import { useRef, useState } from 'react';
 import type { MediaRecord } from '@/lib/media/types';
-import { uploadMediaAction, deleteMediaAction, updateMediaAltAction } from '@/lib/media/actions';
+import { deleteMediaAction, updateMediaAltAction } from '@/lib/media/actions';
+import { uploadMediaFile } from '@/lib/media/upload-client';
 
 function fmtSize(b: number | null) { return b == null ? '' : b < 1024*1024 ? `${Math.round(b/1024)} KB` : `${(b/1048576).toFixed(1)} MB`; }
 
@@ -62,8 +63,8 @@ export default function MediaLibrary({ initial, configured }: { initial: MediaRe
     if (!files || !files.length) return;
     setError(null); setBusy(true);
     for (const file of Array.from(files)) {
-      const fd = new FormData(); fd.set('file', file);
-      const res = await uploadMediaAction(fd);
+      // §v1.2.6-final2 direct-to-Supabase: bytes go browser → Storage, not through a Server Action.
+      const res = await uploadMediaFile(file);
       if (res.ok) setItems(prev => [res.data, ...prev]);
       else { setError(`${file.name}: ${res.message}`); }
     }

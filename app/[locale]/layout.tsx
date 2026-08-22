@@ -72,7 +72,7 @@ export default async function LocaleLayout({ children, params }:
     { label: nl.scents[locale] || dict.nav.scents, href: sectionPath('scents', locale) },
     { label: nl.industries[locale] || dict.nav.industries, href: sectionPath('industries', locale) },
     { label: nl.sample[locale] || (locale==='de'?'Duftmuster':locale==='en'?'Fragrance Sample':'Échantillons'), href: sectionPath('sample', locale) },
-    { label: nl.production[locale] || dict.nav.production, href: `/${locale}#produktion` },
+    { label: nl.production[locale] || dict.nav.production, href: sectionPath('production', locale) },
     { label: nl.faq[locale] || dict.nav.faq, href: `/${locale}#faq` },
   ];
   return (

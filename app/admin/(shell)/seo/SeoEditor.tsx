@@ -19,11 +19,14 @@ const PAGE_LABELS: Record<SeoPageKey, string> = {
 // Which pages expose an editable H1 / intro (pages that render an intro section on the
 // storefront). §3 Home is excluded here: the hero H1/subtitle is managed in HomeEditor, so
 // the SEO center manages only title/meta/OG for Home (no second fake H1/intro source).
-const HAS_INTRO: SeoPageKey[] = ['products','scents','industries','sample','autohaus','werkstatt','about','b2b','blog'];
-// §3 Pages the SEO center actually manages. 'production' is intentionally omitted — there is
-// no standalone indexable production route (it is /#produktion), so no controls are shown for
-// it rather than pretending they work.
-const MANAGED_PAGES: SeoPageKey[] = ['home','products','scents','industries','sample','autohaus','werkstatt','about','b2b','blog'];
+// §v1.2.6-final2: 'production' now renders a real /{locale}/produktion landing page whose H1/
+// intro come from settings.seo.pages.production (fallback PRODUCTION_COPY), so it is included.
+const HAS_INTRO: SeoPageKey[] = ['products','scents','industries','sample','production','autohaus','werkstatt','about','b2b','blog'];
+// §3 Pages the SEO center actually manages. §v1.2.6-final2: 'production' is now a legitimate
+// managed page — v1.2.6 added the real localized Production route (/de/produktion, /en/production,
+// /fr/production) and settings.seo.pages.production already exists in the model, so the SEO center
+// edits title/meta/H1/intro/OG for it (no migration, no new field).
+const MANAGED_PAGES: SeoPageKey[] = ['home','products','scents','industries','sample','production','autohaus','werkstatt','about','b2b','blog'];
 
 export default function SeoEditor({ initial, configured }:{ initial: SiteSettings; configured: boolean }) {
   const [s, setS] = useState<SiteSettings>(initial);
@@ -46,10 +49,18 @@ export default function SeoEditor({ initial, configured }:{ initial: SiteSetting
     else { setSave('error'); setMsg(res.message); }
   }
 
+  // §v1.2.6-final2 STABLE UNIQUE IDENTITY: field() (the SEO title/meta/H1/intro/OG panel) and
+  // indBlock() (the industry VISIBLE-content panel) can be rendered for the same page key
+  // (autohaus/werkstatt) as sibling elements. Keying both by the bare page key produced two
+  // different sibling panels sharing key="autohaus"/key="werkstatt", which is invalid React
+  // identity and caused controlled-input keystrokes to append DOM nodes instead of updating in
+  // place. Each panel now carries a distinct, namespaced, non-changing key: `seo-page-<k>` for
+  // the SEO panel and `industry-visible-<k>` for the visible-content panel — never an index,
+  // random value or timestamp.
   const field = (k: SeoPageKey) => {
     const p = s.seo.pages[k];
     return (
-      <div className="adm-panel" key={k}>
+      <div className="adm-panel" key={`seo-page-${k}`}>
         <strong>{PAGE_LABELS[k]}</strong>
         <div className="field"><label>SEO başlığı ({tab.toUpperCase()})</label>
           <input className="input" value={p.title[tab]} onChange={e=>setPage(k,'title',tab,e.target.value)} placeholder="Marka eki otomatik eklenir — tekrar yazmayın" /></div>
@@ -75,7 +86,7 @@ export default function SeoEditor({ initial, configured }:{ initial: SiteSetting
     // §3 Industry content = VISIBLE H1/body only. SEO title/meta/OG for these pages is the
     // seo.pages.autohaus / seo.pages.werkstatt block (single source) rendered by field() below.
     return (
-      <div className="adm-panel" key={k}>
+      <div className="adm-panel" key={`industry-visible-${k}`}>
         <strong>{label} — görünen içerik ({tab.toUpperCase()})</strong>
         <p className="muted" style={{ fontSize:'.82rem', margin:'.25rem 0 var(--s-3)' }}>Yalnızca sayfadaki H1 ve gövde metni. SEO başlığı/açıklaması aşağıdaki “{label}” SEO kartından yönetilir (tek kaynak).</p>
         <div className="field"><label>H1</label><input className="input" value={c.h1[tab]} onChange={e=>setInd(k,'h1',tab,e.target.value)} /></div>

@@ -41,7 +41,7 @@ export default function MobileMenu({ locale, dict, alternates, navLabels }:
     { label: dict.nav.scents, href: sectionPath('scents', locale) },
     { label: dict.nav.industries, href: sectionPath('industries', locale) },
     { label: locale==='de'?'Duftmuster':locale==='en'?'Fragrance Sample':'Échantillons', href: sectionPath('sample', locale) },
-    { label: dict.nav.production, href: `/${locale}#produktion` },
+    { label: dict.nav.production, href: sectionPath('production', locale) },
     { label: dict.nav.faq, href: `/${locale}#faq` },
     { label: dict.nav.contact, href: `/${locale}#angebot` },
   ];
@@ -58,33 +58,39 @@ export default function MobileMenu({ locale, dict, alternates, navLabels }:
           <button className="sficon" aria-label={t.close} onClick={close}>×</button>
         </header>
 
-        <button className="menu-search" onClick={() => openSearch()}>
-          <IconSearch size={18} /><span>{t.searchPh}</span>
-        </button>
+        {/* §v1.2.6 B2 — scrollable region: only the drawer content scrolls (background is locked
+            by the provider). flex:1 + min-height:0 + overscroll-behavior:contain keep the lower
+            controls (account, language, currency) reachable within the visible viewport, with
+            safe-area bottom padding so nothing hides behind the iPhone home indicator. */}
+        <div className="mm-scroll">
+          <button className="menu-search" onClick={() => openSearch()}>
+            <IconSearch size={18} /><span>{t.searchPh}</span>
+          </button>
 
-        <nav className="menu-nav" aria-label={t.menu}>
-          {links.map(l => (
-            <button key={l.href} className="menu-nav__item" onClick={() => go(l.href)}>{l.label}</button>
-          ))}
-        </nav>
+          <nav className="menu-nav" aria-label={t.menu}>
+            {links.map(l => (
+              <button key={l.href} className="menu-nav__item" onClick={() => go(l.href)}>{l.label}</button>
+            ))}
+          </nav>
 
-        <button className="btn btn--primary menu-cta" onClick={() => go(configuratorPath(locale))}>
-          <IconSpark size={18} /> {dict.cta.configure}
-        </button>
+          <button className="btn btn--primary menu-cta" onClick={() => go(configuratorPath(locale))}>
+            <IconSpark size={18} /> {dict.cta.configure}
+          </button>
 
-        <button className="menu-nav__item menu-account-link" onClick={() => go(`/${locale}/konto`)}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: '.5rem', verticalAlign: 'middle' }}><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
-          {accountLabel}
-        </button>
+          <button className="menu-nav__item menu-account-link" onClick={() => go(`/${locale}/konto`)}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: '.5rem', verticalAlign: 'middle' }}><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+            {accountLabel}
+          </button>
 
-        <div className="menu-prefs">
-          <div className="menu-pref">
-            <span className="menu-pref__label">{t.language}</span>
-            <LanguageSwitcher current={locale} alternates={alternates} />
-          </div>
-          <div className="menu-pref">
-            <span className="menu-pref__label">{t.currency}</span>
-            <CurrencySwitcher />
+          <div className="menu-prefs">
+            <div className="menu-pref">
+              <span className="menu-pref__label">{t.language}</span>
+              <LanguageSwitcher current={locale} alternates={alternates} />
+            </div>
+            <div className="menu-pref">
+              <span className="menu-pref__label">{t.currency}</span>
+              <CurrencySwitcher />
+            </div>
           </div>
         </div>
 

@@ -20,6 +20,7 @@ import JsonLd from '@/seo/JsonLd';
 import Configurator from '@/components/configurator/Configurator';
 import TrackProductView from '@/components/product/TrackProductView';
 import SamplePage from '@/components/storefront/SamplePage';
+import ProductionLanding, { PRODUCTION_COPY } from '@/components/home/ProductionLanding';
 import { PrintFileCheckSection } from '@/components/storefront/PrintFileCheckCta';
 import { getSettings } from '@/repositories/settings';
 import { optionLabel } from '@/lib/i18n/product-options';
@@ -48,7 +49,7 @@ function resolve(locale: Locale, slug: string[]): Resolved {
 export function generateStaticParams() {
   const out: Params[] = [];
   for (const locale of locales) {
-    for (const s of ['products','scents','industries','configurator','sample'] as Section[]) out.push({ locale, slug:[seg[s][locale]] });
+    for (const s of ['products','scents','industries','configurator','sample','production'] as Section[]) out.push({ locale, slug:[seg[s][locale]] });
     for (const p of listProducts(locale)) out.push({ locale, slug:[seg.products[locale], p.slug] });
     for (const i of listIndustries(locale)) out.push({ locale, slug:[seg.industries[locale], i.slug] });
   }
@@ -102,7 +103,19 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
       alternates: sectionAlternates('sample'), brand,
       ogImage: sp.ogImage || settings.defaultOgImage || undefined });
   }
-  // section index (products / scents / industries / production)
+  // §v1.2.6 Production landing page — real localized SEO (canonical/hreflang/x-default via
+  // buildMetadata). §v1.2.6-final2: admin-entered Production SEO (settings.seo.pages.production)
+  // now overrides; PRODUCTION_COPY stays the safe fallback when a field is empty. Uses the
+  // existing settings model — no migration, no new content source. Factual copy only.
+  if (r.kind === 'section-index' && r.section === 'production') {
+    const pp = pages.production;
+    return buildMetadata({ locale, path: sectionPath('production', locale),
+      title: pp.title[locale] || PRODUCTION_COPY[locale].title,
+      description: pp.description[locale] || PRODUCTION_COPY[locale].description,
+      alternates: sectionAlternates('production'), brand,
+      ogImage: pp.ogImage || settings.defaultOgImage || undefined });
+  }
+  // section index (products / scents / industries)
   const dict = getDict(locale);
   const seedTitles: Record<Section, string> = {
     products: dict.nav.products,
@@ -110,6 +123,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
     industries: dict.nav.industries,
     configurator: "Konfigurator",
     sample: locale==='de' ? 'Duftmuster' : locale==='en' ? 'Fragrance Sample' : 'Échantillons',
+    production: PRODUCTION_COPY[locale].title,
   };
   // Map the resolved section to a SEO page key where admin overrides exist.
   const pageKey = r.section === 'products' ? 'products'
@@ -179,6 +193,25 @@ export default async function CatchAll({ params, searchParams }: { params: Promi
       identity={sampleUser?.id ?? 'guest'}
       h1={spSeo.h1[locale] || null} intro={spSeo.intro[locale] || null}
       contactEmail={settings.contact.email || null} contactWhatsapp={settings.contact.whatsapp || null} />;
+  }
+
+  if (r.kind === 'section-index' && r.section === 'production') {
+    // §v1.2.6 Real Production landing page. §v1.2.6-final2: the VISIBLE H1/intro now come from
+    // settings.seo.pages.production (admin override) with PRODUCTION_COPY as the safe fallback —
+    // reusing the existing settings model (no migration, no new content source). Breadcrumb
+    // schema stays consistent with other pages.
+    const settings = await getSettings();
+    const pp = settings.seo.pages.production;
+    const h1 = pp.h1[locale] || PRODUCTION_COPY[locale].h1;
+    const intro = pp.intro[locale] || PRODUCTION_COPY[locale].intro;
+    const crumbs = [ crumbHome,
+      { name: h1, url: abs(sectionPath('production', locale)) } ];
+    return (
+      <>
+        <JsonLd data={breadcrumbLd(crumbs)} />
+        <ProductionLanding locale={locale} h1={h1} intro={intro} />
+      </>
+    );
   }
 
   if (r.kind === 'product') {

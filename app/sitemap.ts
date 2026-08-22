@@ -34,6 +34,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   } catch {}
 
+  // §v1.2.6 A1 — Real Production landing page (localized), included with reciprocal hreflang.
+  {
+    const alt = sectionAlternates('production');
+    for (const l of locales) out.push({ url: abs(sectionPath('production', l)), changeFrequency:'monthly', priority:0.6, alternates: withAlt(alt) });
+  }
+
+  // §v1.2.6 A1 — Indexable company info pages (Über BUGO / About, B2B). These are managed via
+  // the SEO center and use a slug-stable path across locales (/{locale}/info/{slug}). Legal
+  // pages (Impressum/Datenschutz/AGB/Widerruf/Versand) are intentionally NOT listed.
+  for (const slug of ['about','b2b'] as const) {
+    const alt = Object.fromEntries(locales.map(l => [l, `/${l}/info/${slug}`])) as Record<string,string>;
+    for (const l of locales) out.push({ url: abs(alt[l]), changeFrequency:'monthly', priority:0.6, alternates: withAlt(alt) });
+  }
+
   // Product details — enumerate current DB products (by group), DB-first localized slugs.
   try {
     const groups = new Set((await getProductsRead('de')).map((p: any) => p.groupId).filter(Boolean));

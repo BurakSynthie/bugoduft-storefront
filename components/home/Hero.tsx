@@ -25,11 +25,28 @@ export default function Hero({ locale, dict, content, hc }:
   return (
     <section className="hero section">
       <Container>
-        <div className="hero__grid">
-          <div>
+        {/* §v1.2.6 C — CSS Grid areas (intro / media / details). A SINGLE hero media instance is
+            repositioned by CSS, never duplicated (no separate mobile/desktop video copy).
+            DESKTOP: intro top-left, details bottom-left, media right (row-gap:0 so the split keeps
+            the original stacked spacing → desktop is visually unchanged).
+            MOBILE: intro → media → details, so the customer reads what BUGO sells, immediately
+            SEES the product video, then reaches the CTAs. The semantic <h1> is preserved. */}
+        <div className={`hero__grid${hc.heroVideo ? ' hero__grid--media' : ''}`}>
+          <div className="hero__intro">
             <span className="eyebrow">{hc.heroEyebrow || content.hero.eyebrow}</span>
             <h1 style={{ marginTop:'var(--s-4)' }}>{hc.heroHead || c.head}</h1>
             <p className="hero__sub">{hc.heroSub || c.sub}</p>
+          </div>
+          {/* Real product visual slot: video (CMS-managed) → image → CSS fallback.
+              Subtle float, reduced-motion safe. */}
+          <div className={`hero__visual hero__area-media${hc.heroVideo ? ' hero__visual--media' : ''}`} aria-hidden={(hc.heroProductImage || hc.heroVideo) ? undefined : true}>
+            {hc.heroVideo
+              ? <HeroMedia video={hc.heroVideo} poster={hc.heroPoster ?? null} />
+              : hc.heroProductImage
+              ? <img className="hero__product" src={hc.heroProductImage} alt="BUGO DUFT Duftanhänger" width={520} height={650} />
+              : <span className="hero__stage" aria-hidden="true"><span className="hero__cord" /><span className="hero__silhouette" /></span>}
+          </div>
+          <div className="hero__details">
             <span className="hero__ship"><IconCheck size={14} /> {hc.shippingIncluded}</span>
             <span className="hero__ship"><IconCheck size={14} /> {c.finalPrice}</span>
             <div className="hero__cta">
@@ -42,15 +59,6 @@ export default function Hero({ locale, dict, content, hc }:
             <div className="hero__cred">
               {hc.credibility.map(cr => <span key={cr} className="hero__credchip">{cr}</span>)}
             </div>
-          </div>
-          {/* Real product visual slot: transparent PNG/WebP when provided (CMS-managed),
-              otherwise the approved CSS product fallback. Subtle float, reduced-motion safe. */}
-          <div className={`hero__visual${hc.heroVideo ? ' hero__visual--media' : ''}`} aria-hidden={(hc.heroProductImage || hc.heroVideo) ? undefined : true}>
-            {hc.heroVideo
-              ? <HeroMedia video={hc.heroVideo} poster={hc.heroPoster ?? null} />
-              : hc.heroProductImage
-              ? <img className="hero__product" src={hc.heroProductImage} alt="BUGO DUFT Duftanhänger" width={520} height={650} />
-              : <span className="hero__stage" aria-hidden="true"><span className="hero__cord" /><span className="hero__silhouette" /></span>}
           </div>
         </div>
       </Container>

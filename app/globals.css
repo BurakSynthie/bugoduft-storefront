@@ -98,8 +98,23 @@ img{max-width:100%;height:auto;display:block}
 
 /* hero */
 .hero{position:relative;overflow:hidden}
-.hero__grid{display:grid;gap:var(--s-8);align-items:center}
-@media(min-width:960px){.hero__grid{grid-template-columns:1.05fr .95fr}}
+/* §v1.2.6 C — hero grid areas. Mobile stacks intro → media → details (DOM order) so the customer
+   sees the product video right after the headline, before the CTAs. Desktop keeps the two-column
+   composition: intro top-left, details bottom-left, media spanning the right column. row-gap:0 on
+   desktop means the intro/details split preserves the ORIGINAL stacked spacing (the elements keep
+   their own margins), so the desktop hero is essentially unchanged. A single media instance is
+   repositioned by grid — never a second video copy. */
+.hero__grid{display:grid;gap:var(--s-6);align-items:center;
+  grid-template-columns:1fr;
+  grid-template-areas:"intro" "media" "details"}
+.hero__intro{grid-area:intro;min-width:0}
+.hero__area-media{grid-area:media}
+.hero__details{grid-area:details;min-width:0}
+@media(min-width:960px){
+  .hero__grid{grid-template-columns:1.05fr .95fr;column-gap:var(--s-8);row-gap:0;
+    grid-template-areas:"intro media" "details media";align-items:center;align-content:center}
+  .hero__area-media{align-self:center}
+}
 .hero h1{font-size:var(--t-hero);font-weight:700;letter-spacing:-.035em}
 .hero h1 .accent{color:var(--accent)}
 .hero__sub{margin-top:var(--s-5);color:var(--fg-muted);font-size:1.1rem;max-width:46ch}
@@ -413,7 +428,12 @@ body.overlay-open{overflow:hidden}
 .sfdrawer.is-open{visibility:visible;pointer-events:auto}
 .sfdrawer__scrim{position:absolute;inset:0;background:rgba(16,18,22,.42);opacity:0;transition:opacity .25s var(--e)}
 .sfdrawer.is-open .sfdrawer__scrim{opacity:1}
-.sfdrawer__panel{position:absolute;top:0;bottom:0;width:min(420px,92vw);background:#fff;display:flex;flex-direction:column;
+/* §v1.2.6 B2 — drawer fits the DYNAMIC (visible) viewport on iOS Safari (100dvh, with 100vh
+   fallback) instead of the layout viewport, and respects the top safe-area so the header is not
+   under the notch. overflow:hidden keeps the panel itself static; only the inner scroll region
+   (.sfdrawer__body / .mm-scroll) scrolls. */
+.sfdrawer__panel{position:absolute;top:0;height:100vh;height:100dvh;max-height:100dvh;overflow:hidden;
+  width:min(420px,92vw);background:#fff;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);
   box-shadow:var(--shadow-lg);transition:transform .28s var(--e);outline:none}
 .sfdrawer--right .sfdrawer__panel{right:0;transform:translateX(100%)}
 .sfdrawer--left .sfdrawer__panel{left:0;transform:translateX(-100%)}
@@ -421,7 +441,12 @@ body.overlay-open{overflow:hidden}
 @media(prefers-reduced-motion:reduce){.sfdrawer__panel,.sfdrawer__scrim{transition:none}}
 .sfdrawer__head{display:flex;align-items:center;justify-content:space-between;padding:var(--s-5);border-bottom:1px solid var(--border);flex:none}
 .sfdrawer__head strong{font-size:1.05rem}
-.sfdrawer__body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:var(--s-5);display:grid;gap:var(--s-4);align-content:start}
+.sfdrawer__body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:var(--s-5);padding-bottom:calc(var(--s-5) + var(--safe-bottom));display:grid;gap:var(--s-4);align-content:start}
+/* §v1.2.6 B2 — MobileMenu scroll region. Only this scrolls; the background is locked by the
+   provider. min-height:0 lets it shrink inside the flex column; overscroll-behavior:contain stops
+   scroll chaining to the page; safe-area bottom padding keeps the language/currency controls clear
+   of the iPhone home indicator. Preserves the existing item margins (no grid/padding reset). */
+.mm-scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(var(--s-6) + var(--safe-bottom))}
 .sfdrawer__foot{flex:none;border-top:1px solid var(--border);padding:var(--s-5);padding-bottom:calc(var(--s-5) + var(--safe-bottom));display:grid;gap:var(--s-4);background:#fff}
 .sficon{width:34px;height:34px;border-radius:9px;border:1px solid var(--border);background:#fff;cursor:pointer;font-size:1.3rem;line-height:1;color:var(--fg-muted)}
 .sficon:hover{border-color:var(--fg)}
@@ -574,7 +599,9 @@ body.overlay-open{overflow:hidden}
 /* Phase 6D: hero video media — responsive, no giant fixed mobile box */
 .hero__media{display:block;width:100%;border-radius:var(--r-lg,20px);overflow:hidden;background:#0b1220}
 .hero__media video{width:100%;height:100%;object-fit:cover;display:block;aspect-ratio:4/5}
-@media(max-width:880px){ .hero__media video{aspect-ratio:16/10;max-height:60vh} }
+/* §v1.2.6 C3 — mobile hero video: premium 16:10, capped height so it shows the product without
+   dominating the first viewport (was 60vh). */
+@media(max-width:880px){ .hero__media video{aspect-ratio:16/10;max-height:230px} }
 
 /* Phase 6D (cont.): compact 3-step order strip */
 .ordersteps{padding:var(--s-6) 0;border-bottom:1px solid var(--border)}
@@ -631,7 +658,8 @@ body.overlay-open{overflow:hidden}
 .hero__visual--media::before{display:none !important;content:none !important}
 .hero__visual--media .hero__media{position:absolute;inset:0;height:100%;border-radius:inherit}
 .hero__visual--media .hero__media video{width:100%;height:100%;object-fit:cover;aspect-ratio:auto;max-height:none}
-@media(max-width:880px){ .hero__visual--media{aspect-ratio:4/3} }
+/* §v1.2.6 C3 — mobile video slot: 16:10, capped height (see .hero__media video above). */
+@media(max-width:880px){ .hero__visual--media{aspect-ratio:16/10;max-height:230px} }
 /* announcement bar: true edge-to-edge on mobile, no left/right gap, clean 1-2 line wrap */
 @media(max-width:640px){ .ann{padding-left:12px;padding-right:12px;font-size:.78rem;line-height:1.35} }
 

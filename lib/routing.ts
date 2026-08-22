@@ -7,6 +7,10 @@ export const seg = {
   industries: { de:'branchen',  en:'industries', fr:'secteurs' },
   configurator:{ de:'konfigurator', en:'configurator', fr:'configurateur' },
   sample:     { de:'duftmuster', en:'fragrance-sample', fr:'echantillon-parfums' },
+  // §v1.2.6 Real, indexable Production landing page (localized). Reuses the existing localized
+  // routing (catch-all + this seg map) — NOT a second routing system. The homepage #produktion
+  // section remains; nav now points here.
+  production: { de:'produktion', en:'production', fr:'production' },
 } satisfies Record<string, Record<Locale, string>>;
 export type Section = keyof typeof seg;
 
