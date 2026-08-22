@@ -31,6 +31,13 @@ export type CfgDraft = {
   backMeta: FileMeta | null;
   backNotes: string;
   supportingMeta: FileMeta[];
+  // §HIGH-14 — persisted Supabase-storage artwork references. These must survive a cart Edit AND
+  // a full page reload (which discards the in-memory File registry). undefined ⇒ this draft
+  // predates the field; null ⇒ no persisted upload; string ⇒ the stored storage path.
+  frontPath?: string | null;
+  backPath?: string | null;
+  supportingPaths?: { field: string; path: string }[];
+  filesPersisted?: boolean;
   step: number;
   locale: Locale;
   updatedAt: number;
@@ -105,7 +112,9 @@ export function hasSessionFiles(configId: string): boolean {
 export const metaOf = (r: ArtworkRef | null): FileMeta | null =>
   r ? { name: r.name, type: r.type, size: r.size } : null;
 
-// Rebuild an ArtworkRef from persisted metadata (no binary after reload).
-export function refFromMeta(m: FileMeta | null): ArtworkRef | null {
-  return m ? { name: m.name, type: m.type, size: m.size, previewUrl: null, storagePath: null, file: null } : null;
+// Rebuild an ArtworkRef from persisted metadata (no binary after reload). §HIGH-14 — carry the
+// persisted Supabase storage path so an unchanged upload survives Edit/reload; only an explicit
+// replace/remove drops it.
+export function refFromMeta(m: FileMeta | null, storagePath: string | null = null): ArtworkRef | null {
+  return m ? { name: m.name, type: m.type, size: m.size, previewUrl: null, storagePath, file: null } : null;
 }

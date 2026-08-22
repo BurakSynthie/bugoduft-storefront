@@ -1,5 +1,5 @@
 import 'server-only';
-import { adminGraphql, isAdminConfigured } from '@/config/shopify-admin';
+import { adminGraphql, isAdminConfigured, ShopifyAdminError } from '@/config/shopify-admin';
 
 // ============================================================================
 // P0 (final hardening §P0-1 / §P0-2): charge the EXACT BUGO authoritative total.
@@ -35,9 +35,23 @@ import { adminGraphql, isAdminConfigured } from '@/config/shopify-admin';
 // ============================================================================
 
 export type DraftOrderAttr = { key: string; value: string };
+// §P0-1 When a created draft fails the amount/currency guard, its deletion is a
+// PAYMENT-SAFETY-CRITICAL invalidation (not best-effort). `cleanup` reports whether that
+// deletion was CONFIRMED. `orphanDraftId` is set ONLY when deletion was attempted but NOT
+// confirmed — a payable invoice of unknown status the caller must record + fail closed on.
+export type DraftCleanup = { attempted: boolean; confirmed: boolean; orphanDraftId?: string };
+// §OPTION-3-v4 #4 CREATE CERTAINTY — every failure result carries an explicit certainty so the
+// caller can decide benefit release / intent transition safely:
+//   'definitely_no_draft'    → no payable draft exists (pre-dispatch validation/config/token, or a
+//                              received response that proves none) → benefit may release if owner.
+//   'confirmed_deleted'      → a draft was created then CONFIRMED deleted → benefit may release.
+//   'known_draft_unresolved' → a known draft id exists, deletion NOT confirmed → orphan + retain.
+//   'unknown_create_outcome' → request dispatched but outcome lost (timeout/abort/5xx) → the draft
+//                              MAY exist → retain benefit, keep intent blocking, never blind-create.
+export type CreateCertainty = 'definitely_no_draft' | 'confirmed_deleted' | 'known_draft_unresolved' | 'unknown_create_outcome';
 export type DraftOrderResult =
   | { ok: true; invoiceUrl: string; draftOrderId: string; name: string }
-  | { ok: false; reason: 'unconfigured' | 'missing_variant' | 'error'; message: string };
+  | { ok: false; reason: 'unconfigured' | 'missing_variant' | 'error'; message: string; cleanup?: DraftCleanup; certainty: CreateCertainty };
 
 const DRAFT_ORDER_CREATE = `
 mutation DraftOrderCreate($input: DraftOrderInput!) {
@@ -75,12 +89,7 @@ function moneyToCents(v: string | null | undefined): number | null {
   return whole * 100 + Number((f + '00').slice(0, 2));
 }
 
-async function deleteDraftQuietly(id: string): Promise<void> {
-  try { await adminGraphql<DraftOrderDeleteResponse>(DRAFT_ORDER_DELETE, { input: { id } }); }
-  catch { /* best-effort cleanup; the honest error is already being returned */ }
-}
-
-// §P0 double-spend lifecycle: delete a previously-created draft for a checkout before
+// §P0-1 double-spend lifecycle: delete a previously-created draft for a checkout before
 // replacing it, so a single configuration/benefit can never have two simultaneously
 // payable Shopify invoices. Returns whether Shopify confirmed the deletion.
 export async function deleteDraftOrder(id: string): Promise<boolean> {
@@ -97,12 +106,12 @@ export async function createBugoDraftOrder(args: {
   customerEmail?: string | null;
 }): Promise<DraftOrderResult> {
   if (!isAdminConfigured()) {
-    return { ok: false, reason: 'unconfigured',
+    return { ok: false, reason: 'unconfigured', certainty: 'definitely_no_draft',
       message: 'Der Shopify-Draft-Order-Checkout ist noch nicht konfiguriert (Admin API fehlt).' };
   }
   // Total must be a strictly positive amount — never let a zero/negative total reach Shopify.
   if (!Number.isFinite(args.totalPriceCents) || args.totalPriceCents <= 0) {
-    return { ok: false, reason: 'error', message: 'Ungültiger Gesamtbetrag.' };
+    return { ok: false, reason: 'error', certainty: 'definitely_no_draft', message: 'Ungültiger Gesamtbetrag.' };
   }
   const currencyCode = (args.currency ?? 'EUR');
   const amount = (args.totalPriceCents / 100).toFixed(2);
@@ -140,7 +149,7 @@ export async function createBugoDraftOrder(args: {
     const ue = data.draftOrderCreate.userErrors;
     const draft = data.draftOrderCreate.draftOrder;
     if (ue?.length || !draft || !draft.invoiceUrl) {
-      return { ok: false, reason: 'error', message: ue?.[0]?.message ?? 'Draft order error' };
+      return { ok: false, reason: 'error', certainty: 'definitely_no_draft', message: ue?.[0]?.message ?? 'Draft order error' };
     }
 
     // §P0-2 GUARANTEE: the payable total must equal the BUGO authoritative total exactly,
@@ -151,17 +160,28 @@ export async function createBugoDraftOrder(args: {
     const pres = draft.totalPriceSet?.presentmentMoney;
     const shopifyCents = moneyToCents(pres?.amount);
     if (shopifyCents == null || shopifyCents !== args.totalPriceCents || pres?.currencyCode !== currencyCode) {
-      await deleteDraftQuietly(draft.id);
+      // §P0-1 SAFETY-CRITICAL invalidation: a mismatched draft is a payable invoice that must
+      // NOT survive. VERIFY the deletion; the caller uses `cleanup.confirmed` to decide whether
+      // it is safe to release a held one-time benefit. If deletion is NOT confirmed the draft id
+      // is surfaced as `orphanDraftId` so the caller records it and fails closed.
+      const deleted = await deleteDraftOrder(draft.id);
       console.error('[shopify-admin] draft total/currency mismatch: expected',
-        args.totalPriceCents, currencyCode, 'got', pres?.amount, pres?.currencyCode);
+        args.totalPriceCents, currencyCode, 'got', pres?.amount, pres?.currencyCode,
+        '— deletion confirmed:', deleted);
       return { ok: false, reason: 'error',
-        message: 'Checkout-Konfigurationsfehler: Der Zahlbetrag oder die Währung stimmt nicht mit dem BUGO-Gesamtpreis überein.' };
+        certainty: deleted ? 'confirmed_deleted' : 'known_draft_unresolved',
+        message: 'Checkout-Konfigurationsfehler: Der Zahlbetrag oder die Währung stimmt nicht mit dem BUGO-Gesamtpreis überein.',
+        cleanup: { attempted: true, confirmed: deleted, orphanDraftId: deleted ? undefined : draft.id } };
     }
 
     return { ok: true, invoiceUrl: draft.invoiceUrl, draftOrderId: draft.id, name: draft.name };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (msg === 'admin_unconfigured') return { ok: false, reason: 'unconfigured', message: 'Shopify Admin API ist nicht konfiguriert.' };
-    return { ok: false, reason: 'error', message: msg };
+    // §OPTION-3-v4 #4 a failure BEFORE request dispatch proves no draft; a failure AFTER dispatch
+    // (timeout/abort/reset/HTTP-5xx/graphql) means the draft MAY exist → unknown_create_outcome.
+    const dispatched = (e instanceof ShopifyAdminError) ? e.dispatched : true;   // unknown → treat as dispatched (safe)
+    if (msg === 'admin_unconfigured') return { ok: false, reason: 'unconfigured', certainty: 'definitely_no_draft', message: 'Shopify Admin API ist nicht konfiguriert.' };
+    return { ok: false, reason: 'error',
+      certainty: dispatched ? 'unknown_create_outcome' : 'definitely_no_draft', message: msg };
   }
 }

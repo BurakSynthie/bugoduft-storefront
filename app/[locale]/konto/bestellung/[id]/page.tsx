@@ -8,13 +8,14 @@ export const dynamic = 'force-dynamic';
 const money = (c:number,cur:string,l:Locale)=> new Intl.NumberFormat(l==='de'?'de-DE':l==='en'?'en-IE':'fr-FR',{style:'currency',currency:cur||'EUR'}).format(c/100);
 const pick = (o:any,...k:string[])=>{ for(const x of k){ if(o&&o[x]!=null&&o[x]!=='') return o[x]; } return null; };
 
-export default async function OrderDetail({ params }: { params:{ locale:string; id:string } }) {
-  if (!isLocale(params.locale)) notFound();
-  const locale = params.locale as Locale;
+export default async function OrderDetail({ params }: { params: Promise<{ locale:string; id:string }> }) {
+  const { locale: lp, id } = await params;          // §HIGH-16 Next.js 15 async params
+  if (!isLocale(lp)) notFound();
+  const locale = lp as Locale;
   const user = await getCustomerUser();
   if (!user) redirect(`/${locale}/konto/anmelden`);
   await ensureCustomerRow(user);
-  const o = await getCustomerOrder(params.id);
+  const o = await getCustomerOrder(id);
   if (!o) notFound();
   const t = ACCOUNT_COPY[locale]; const ap = APPROVAL_COPY[locale];
   const cur = STATUS_ORDER.indexOf(o.opStatus as any);

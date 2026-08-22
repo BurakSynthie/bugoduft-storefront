@@ -38,6 +38,7 @@ export type HomeExtra = {
   support: { grafik: SupportContact; kundenservice: SupportContact };
   social: Social;
   sections?: HomeSections;             // §3 editable section chrome (eyebrows/titles/empty-states)
+  scentsHeading?: { eyebrow: string; title: string; description: string };  // §7 editable Scents section heading (per-locale via Record<Locale,HomeExtra>)
 };
 
 const WA_GRAFIK = '905072966175';
@@ -45,7 +46,7 @@ const WA_SERVICE = '905317234801';
 
 const de: HomeExtra = {
   heroProductImage: null,
-  heroChips: ['Ab 1.000 Stück','10–12 Werktage Produktion','ca. 15–17 Werktage Lieferung','Weltweiter Versand'],
+  heroChips: ['Ab 1.000 Stück','10–12 Werktage Produktion','ca. 15–17 Werktage Lieferung','Europaweiter Versand'],
   shippingIncluded: 'Versand inklusive',
   credibility: ['12+ Jahre Erfahrung','3–4 Mio. Stück / Monat Kapazität'],
   stats: [
@@ -53,7 +54,7 @@ const de: HomeExtra = {
     { value:'3–4 Mio.', label:'Stück / Monat Kapazität' },
     { value:'ab 1.000', label:'Stück Mindestmenge' },
     { value:'10–12', label:'Werktage Produktion' },
-    { value:'weltweit', label:'Versand' },
+    { value:'europaweit', label:'Versand' },
   ],
   production: [
     { n:'01', title:'Druck', body:'Präziser beidseitiger Druck für eine saubere Markenwirkung.', poster:null, video:null },
@@ -67,7 +68,7 @@ const de: HomeExtra = {
     { title:'Hohe Kapazität', body:'3–4 Mio. Stück pro Monat – auch große Auflagen sind planbar.' },
     { title:'Individuelles Design', body:'Ihr Logo, Ihre Form, Ihr Duft – vollständig gestaltbar.' },
     { title:'Ab 1.000 Stück', body:'Klare Mindestmenge in 1.000er-Schritten.' },
-    { title:'Weltweiter Versand', body:'Produktion und Lieferung bis zu Ihnen.' },
+    { title:'Europaweiter Versand', body:'Produktion in Deutschland, Lieferung europaweit – Versand inklusive.' },
     { title:'Planbare Zeiten', body:'10–12 Werktage Produktion, ca. 15–17 Werktage bis zur Lieferung.' },
     { title:'Vorder- & Rückseite flexibel', body:'Unterschiedliche Motive vorne/hinten – gleiche Außenform.' },
     { title:'Designunterstützung', body:'Unser Grafikteam begleitet Ihre Druckdaten.' },
@@ -93,7 +94,7 @@ const de: HomeExtra = {
     ]},
     { group:'DÜFTE', items:[
       { q:'Wie wähle ich den Duft?', a:'Im Konfigurator wählen Sie aus unseren Duftwelten den passenden Markenduft.' },
-      { q:'Was ist Intensivduft?', a:'Intensivduft ist eine intensivere Duftveredelung – einmalig +30,00 € pro Konfiguration, nicht pro Stück.' },
+      { q:'Was ist Intensivduft?', a:'Intensivduft ist eine intensivere Duftveredelung – +30,00 € pro 1.000 Stück (Aufpreis pro Menge, nicht einmalig).' },
     ]},
     { group:'PRODUKTION', items:[
       { q:'Wie lange dauert die Produktion?', a:'Die Produktion dauert in der Regel 10–12 Werktage nach Designfreigabe.' },
@@ -101,7 +102,7 @@ const de: HomeExtra = {
     ]},
     { group:'VERSAND & ZAHLUNG', items:[
       { q:'Wie lange bis zur Lieferung?', a:'In der Regel ca. 15–17 Werktage bis zur Lieferung, inklusive Produktion.' },
-      { q:'Liefern Sie weltweit?', a:'Ja, wir liefern weltweit.' },
+      { q:'Liefern Sie europaweit?', a:'Ja, wir liefern europaweit. Versand ist inklusive, anfallende Zollkosten sind – wo zutreffend – enthalten.' },
       { q:'Ist der Versand inklusive?', a:'Ja. Der angezeigte BUGO-Preis ist der finale Preis inklusive Versand – keine zusätzlichen Kosten beim Checkout.' },
     ]},
   ],
@@ -114,7 +115,7 @@ const de: HomeExtra = {
 
 const en: HomeExtra = {
   heroProductImage: null,
-  heroChips: ['From 1,000 units','10–12 working days production','approx. 15–17 working days delivery','Worldwide shipping'],
+  heroChips: ['From 1,000 units','10–12 working days production','approx. 15–17 working days delivery','Europe-wide shipping'],
   shippingIncluded: 'Shipping included',
   credibility: ['12+ years of experience','3–4 million units / month capacity'],
   stats: [
@@ -122,7 +123,7 @@ const en: HomeExtra = {
     { value:'3–4M', label:'units / month capacity' },
     { value:'from 1,000', label:'minimum units' },
     { value:'10–12', label:'working days production' },
-    { value:'worldwide', label:'shipping' },
+    { value:'Europe-wide', label:'shipping' },
   ],
   production: [
     { n:'01', title:'Printing', body:'Precise double-sided printing for a clean brand impression.', poster:null, video:null },
@@ -136,7 +137,7 @@ const en: HomeExtra = {
     { title:'High capacity', body:'3–4 million units per month – large runs are plannable.' },
     { title:'Individual design', body:'Your logo, your shape, your scent – fully customisable.' },
     { title:'From 1,000 units', body:'A clear minimum in steps of 1,000.' },
-    { title:'Worldwide shipping', body:'Production and delivery all the way to you.' },
+    { title:'Europe-wide shipping', body:'Produced in Germany, delivered Europe-wide – shipping included.' },
     { title:'Predictable timing', body:'10–12 working days production, approx. 15–17 to delivery.' },
     { title:'Flexible front & back', body:'Different artwork front/back – same outer shape.' },
     { title:'Design support', body:'Our graphics team assists with your print data.' },
@@ -162,7 +163,7 @@ const en: HomeExtra = {
     ]},
     { group:'SCENTS', items:[
       { q:'How do I choose the scent?', a:'In the configurator you pick the right brand scent from our fragrance worlds.' },
-      { q:'What is Intensive fragrance?', a:'Intensive fragrance is a more intense finishing – a one-time +€30.00 per configuration, not per unit.' },
+      { q:'What is Intensive fragrance?', a:'Intensive fragrance is a more intense finishing – +€30.00 per 1,000 units (surcharge scales with quantity, not one-time).' },
     ]},
     { group:'PRODUCTION', items:[
       { q:'How long does production take?', a:'Production usually takes 10–12 working days after design approval.' },
@@ -170,7 +171,7 @@ const en: HomeExtra = {
     ]},
     { group:'SHIPPING & PAYMENT', items:[
       { q:'How long until delivery?', a:'Usually approx. 15–17 working days to delivery, including production.' },
-      { q:'Do you ship worldwide?', a:'Yes, we ship worldwide.' },
+      { q:'Do you ship Europe-wide?', a:'Yes, we deliver Europe-wide. Shipping is included and any applicable customs costs are covered where applicable.' },
       { q:'Is shipping included?', a:'Yes. The BUGO price shown is the final price including shipping – no additional costs at checkout.' },
     ]},
   ],
@@ -183,7 +184,7 @@ const en: HomeExtra = {
 
 const fr: HomeExtra = {
   heroProductImage: null,
-  heroChips: ['Dès 1 000 pièces','10–12 jours ouvrés de production','env. 15–17 jours ouvrés de livraison','Livraison mondiale'],
+  heroChips: ['Dès 1 000 pièces','10–12 jours ouvrés de production','env. 15–17 jours ouvrés de livraison','Livraison en Europe'],
   shippingIncluded: 'Livraison incluse',
   credibility: ['12+ ans d’expérience','Capacité de 3–4 millions de pièces / mois'],
   stats: [
@@ -191,7 +192,7 @@ const fr: HomeExtra = {
     { value:'3–4 M', label:'pièces / mois' },
     { value:'dès 1 000', label:'pièces minimum' },
     { value:'10–12', label:'jours ouvrés production' },
-    { value:'mondiale', label:'livraison' },
+    { value:'en Europe', label:'livraison' },
   ],
   production: [
     { n:'01', title:'Impression', body:'Impression recto-verso précise pour un rendu de marque net.', poster:null, video:null },
@@ -205,7 +206,7 @@ const fr: HomeExtra = {
     { title:'Grande capacité', body:'3–4 millions de pièces par mois – les grands volumes sont planifiables.' },
     { title:'Design personnalisé', body:'Votre logo, votre forme, votre parfum – entièrement personnalisable.' },
     { title:'Dès 1 000 pièces', body:'Un minimum clair, par tranches de 1 000.' },
-    { title:'Livraison mondiale', body:'Production et livraison jusqu’à vous.' },
+    { title:'Livraison en Europe', body:'Produits en Allemagne, livrés partout en Europe – livraison incluse.' },
     { title:'Délais prévisibles', body:'10–12 jours ouvrés de production, env. 15–17 jusqu’à la livraison.' },
     { title:'Recto & verso flexibles', body:'Motifs différents recto/verso – même forme extérieure.' },
     { title:'Accompagnement design', body:'Notre équipe graphique accompagne vos fichiers d’impression.' },
@@ -231,7 +232,7 @@ const fr: HomeExtra = {
     ]},
     { group:'PARFUMS', items:[
       { q:'Comment choisir le parfum ?', a:'Dans le configurateur, vous choisissez le parfum de marque adapté parmi nos univers olfactifs.' },
-      { q:'Qu’est-ce que le parfum intense ?', a:'Le parfum intense est une finition plus intense – +30,00 € une seule fois par configuration, pas par pièce.' },
+      { q:'Qu’est-ce que le parfum intense ?', a:'Le parfum intense est une finition plus intense – +30,00 € par 1 000 pièces (supplément selon la quantité, pas unique).' },
     ]},
     { group:'PRODUCTION', items:[
       { q:'Combien de temps dure la production ?', a:'La production dure en général 10–12 jours ouvrés après validation du design.' },
@@ -239,7 +240,7 @@ const fr: HomeExtra = {
     ]},
     { group:'LIVRAISON & PAIEMENT', items:[
       { q:'Quel délai jusqu’à la livraison ?', a:'En général env. 15–17 jours ouvrés jusqu’à la livraison, production comprise.' },
-      { q:'Livrez-vous dans le monde entier ?', a:'Oui, nous livrons dans le monde entier.' },
+      { q:'Livrez-vous partout en Europe ?', a:'Oui, nous livrons partout en Europe. La livraison est incluse et les frais de douane éventuels sont couverts le cas échéant.' },
       { q:'La livraison est-elle incluse ?', a:'Oui. Le prix BUGO affiché est le prix final, livraison comprise – aucun coût supplémentaire au paiement.' },
     ]},
   ],

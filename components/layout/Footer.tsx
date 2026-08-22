@@ -9,12 +9,20 @@ import CookieSettingsButton from '@/components/layout/CookieSettingsButton';
 export default function Footer({ locale, dict, settings }: { locale: Locale; dict: Dict; settings?: SiteSettings }) {
   const f = dict.footer;
   const c = settings?.contact;
+  // §B single brand source for footer logo + copyright (falls back to the shipped default).
+  const brand = settings?.brandName || 'BUGO DUFT';
   // Completion pass §11: footer business copy is admin-editable (Ayarlar -> Footer,
   // repositories/settings.ts single source of truth) with the existing static i18n
   // strings kept only as the seed-fallback for never-configured state. Legal/technical
   // route labels/links (f.legal, f.company, f.service columns) stay static — those are
   // fixed navigation, not business copy, and are explicitly out of scope here.
   const fc = settings?.footer;
+  // §8 Footer uses the SAME centralized, admin-editable navigation labels as the desktop
+  // header and mobile drawer (settings.navLabels), falling back to the static dictionary when
+  // a label is empty or settings are unavailable. Routes remain fixed in code.
+  const nl = settings?.navLabels;
+  const navLabel = (k: 'products'|'scents'|'industries'|'sample'|'production'|'faq', fallback: string) =>
+    (nl?.[k]?.[locale] || fallback);
   const brandCopy = fc?.brandCopy?.[locale] || (dict.common.minOrder + '.');
   const minOrderCopy = fc?.minOrderCopy?.[locale] || '';
   const bottomStatement = settings?.originClaim?.[locale] || fc?.bottomStatement?.[locale] || '';
@@ -35,20 +43,24 @@ export default function Footer({ locale, dict, settings }: { locale: Locale; dic
       <Container>
         <div className="footer__cols">
           <div>
-            <Link className="logo" href={`/${locale}`} style={{ color:'#fff' }}><span className="logo__mark" />BUGO&nbsp;DUFT</Link>
+            <Link className="logo" href={`/${locale}`} style={{ color:'#fff' }}>
+              {settings?.brand.logo
+                ? <img className="logo__img logo__img--footer" src={settings.brand.logo} alt={brand} />
+                : <><span className="logo__mark" />{brand}</>}
+            </Link>
             <p style={{ color:'#8B93A2', marginTop:'var(--s-4)', maxWidth:'32ch', fontSize:'.9rem' }}>{brandCopy}</p>
             {minOrderCopy && <p style={{ color:'#8B93A2', marginTop:'var(--s-2)', maxWidth:'32ch', fontSize:'.85rem' }}>{minOrderCopy}</p>}
           </div>
           {col(f.products, [
-            [dict.nav.products, sectionPath('products', locale)],
-            [dict.nav.scents, sectionPath('scents', locale)],
-            [dict.nav.industries, sectionPath('industries', locale)],
-            [locale==='de'?'Duftmuster':locale==='en'?'Fragrance Sample':'Échantillons', sectionPath('sample', locale)],
-            [dict.nav.production, `/${locale}#produktion`],
+            [navLabel('products', dict.nav.products), sectionPath('products', locale)],
+            [navLabel('scents', dict.nav.scents), sectionPath('scents', locale)],
+            [navLabel('industries', dict.nav.industries), sectionPath('industries', locale)],
+            [navLabel('sample', locale==='de'?'Duftmuster':locale==='en'?'Fragrance Sample':'Échantillons'), sectionPath('sample', locale)],
+            [navLabel('production', dict.nav.production), `/${locale}#produktion`],
           ])}
           {col(f.service, [
             [dict.nav.contact, `/${locale}#kontakt`],
-            [dict.nav.faq, `/${locale}#faq`],
+            [navLabel('faq', dict.nav.faq), `/${locale}#faq`],
             [f.shipping, `/${locale}/info/versand`],
             [f.orderStatus, `/${locale}/konto/bestellungen`],
           ])}
@@ -70,7 +82,7 @@ export default function Footer({ locale, dict, settings }: { locale: Locale; dic
           {social.length > 0 && col(dict.nav.contact, social.map(([l, h]) => [l, h] as [string, string]))}
         </div>
         <div className="footer__bottom">
-          <span>© {new Date().getFullYear()} BUGO DUFT. {f.rights}</span>
+          <span>© {new Date().getFullYear()} {brand}. {f.rights}</span>
           <span>{bottomStatement}</span>
         </div>
       </Container>

@@ -7,22 +7,14 @@ import { checkoutCartItem } from '@/lib/cart/checkout-client';
 import { formatMoney, formatQty } from '@/lib/money';
 import { sf } from '@/lib/i18n/storefront';
 import { configuratorPath } from '@/lib/routing';
-import { saveDraft, setLive, refFromMeta, type CfgDraft } from '@/lib/configurator/draft';
+import { saveDraft, setLive, refFromMeta } from '@/lib/configurator/draft';
+import { itemToDraft } from '@/lib/cart/edit';
 import { IconCart } from '@/components/ui/icons';
 import type { Locale } from '@/i18n/config';
 
-// Load a cart item back into the configurator draft so "Bearbeiten" re-opens the
-// SAME configuration (same configId → re-adding updates in place, no duplicate).
-function itemToDraft(item: CartItem): CfgDraft {
-  return {
-    v: 1, configId: item.configId, collectionCode: item.collectionCode,
-    quantity: item.quantity, qtyText: '',
-    scentCode: item.scentCode, scentCat: 'all', intensity: item.intensity, shape: item.shape,
-    frontMeta: item.frontMeta, frontNotes: item.frontInstructions,
-    sameBack: item.sameBackAsFront, backMeta: item.backMeta, backNotes: item.backInstructions,
-    supportingMeta: [], step: 7, locale: item.locale, updatedAt: Date.now(),
-  };
-}
+// itemToDraft (loading a cart item back into the configurator draft so "Bearbeiten" re-opens the
+// SAME configuration — same configId → re-adding updates in place, no duplicate) now lives in the
+// pure, unit-tested lib/cart/edit.ts so designMode / scentCode2 / artwork paths can't be dropped.
 
 export default function CartDrawer({ locale }: { locale: Locale }) {
   const { items, overlay, close, remove, totalCents } = useStorefront();
@@ -30,6 +22,9 @@ export default function CartDrawer({ locale }: { locale: Locale }) {
   const t = sf(locale);
   const open = overlay === 'cart';
   const panelRef = useRef<HTMLDivElement>(null);
+  // §Analytics 3B — remembers cart items already counted as begin_checkout so retries / rerenders
+  // never double-fire. Cleared per drawer session below.
+  const beganCheckout = useRef<Set<string>>(new Set());
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +52,17 @@ export default function CartDrawer({ locale }: { locale: Locale }) {
     // refFromMeta keeps types honest even though checkout uses stored paths / session files
     void refFromMeta(item.frontMeta);
     const res = await checkoutCartItem(item, t.checkoutErr);
-    if (res.ok) { window.location.href = res.url; return; }
+    if (res.ok) {
+      // §Analytics 3B — genuine checkout boundary: the server accepted the item and returned a
+      // checkout URL (user committed, not merely opened the drawer). Fire once per item via the
+      // consent-aware abstraction; guarded against retries/rerenders and wrapped so analytics can
+      // never block or delay the redirect.
+      if (!beganCheckout.current.has(item.cartItemId)) {
+        beganCheckout.current.add(item.cartItemId);
+        try { window.bugoTrack?.('begin_checkout', { item_id: item.collectionCode, quantity: item.quantity, value: item.priceCents/100, currency: 'EUR' }); } catch {}
+      }
+      window.location.href = res.url; return;
+    }
     setError(res.message); setBusy(null);
   }
 

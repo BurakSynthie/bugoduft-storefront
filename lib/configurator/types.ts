@@ -27,8 +27,8 @@ export type BugoConfiguration = {
   backInstructions: string;
   supportingFiles: ArtworkRef[];
   basePriceCents: number;             // per approved collection price (integer cents)
-  surchargeCents: number;             // intensive fragrance (once) or 0
-  totalPriceCents: number;            // basePriceCents + surchargeCents
+  surchargeCents: number;             // intensive fragrance: rate × (quantity / 1.000), else 0
+  totalPriceCents: number;            // tier total + intensive surcharge (server is authoritative)
   currency: 'EUR';
   locale: Locale;
 };

@@ -6,18 +6,25 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "tsx lib/pricing/tiers.test.ts && tsx lib/checkout/checkout.test.ts && tsx lib/cart/edit.test.ts && tsx lib/customer/email.test.ts && tsx lib/customer/verified.test.ts && tsx lib/checkout/money.test.ts && tsx lib/checkout/event-time.test.ts && tsx lib/checkout/origin.test.ts && tsx lib/checkout/origin-route.static.test.ts && tsx lib/checkout/sample-attempt.test.ts && tsx lib/checkout/sample-attempt-rotate.test.ts && tsx lib/checkout/create-certainty.test.ts && tsx lib/settings/launch.test.ts && tsx lib/settings/wiring.test.ts && tsx lib/settings/launch-patch.test.ts && tsx lib/checkout/artwork-validation.test.ts && tsx lib/checkout/order-snapshot.test.ts && tsx lib/checkout/closeout.test.ts && tsx lib/checkout/quote-ratelimit.test.ts && tsx lib/blog/blog.test.ts && tsx lib/blog/blog-wiring.test.ts",
+    "test:sql": "node lib/checkout/sql-verify.mjs && node lib/customer/identity-rls.test.mjs && node lib/checkout/webhook-reconcile.test.mjs && node lib/checkout/webhook-perms.test.mjs && node lib/checkout/webhook-migration-lineage.test.mjs && node lib/checkout/webhook-atomic-ordering.test.mjs && node lib/checkout/checkout-intent.test.mjs && node lib/checkout/checkout-intent-perms.test.mjs && node lib/checkout/checkout-ownership.test.mjs && node lib/checkout/checkout-ownership-perms.test.mjs && node lib/checkout/checkout-closure.test.mjs && node lib/checkout/checkout-v41-wiring.test.mjs && node lib/checkout/quote-perms.test.mjs && node lib/blog/blog-migration-lineage.test.mjs && node lib/blog/blog-rls.test.mjs"
   },
   "dependencies": {
-    "next": "14.2.5",
+    "next": "15.5.23",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "@supabase/supabase-js": "2.45.4",
     "@supabase/ssr": "0.5.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.2.17",
     "@types/node": "20.14.0",
     "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "eslint": "8.57.0",
+    "eslint-config-next": "15.5.23",
+    "tsx": "4.19.2",
     "typescript": "5.5.3"
   }
 }

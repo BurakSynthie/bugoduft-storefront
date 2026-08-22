@@ -85,6 +85,7 @@ export default function Editor({ initial, configured }: { initial: EditableProdu
           <div className="field"><label>Sipariş miktarı (maks)</label><input className="input" inputMode="numeric" value={p.maxQty} onChange={e=>setP(s=>({...s,maxQty:num(e.target.value)}))} /></div>
           <div className="field"><label>Sıra</label><input className="input" inputMode="numeric" value={p.sortOrder} onChange={e=>setP(s=>({...s,sortOrder:num(e.target.value)}))} /></div>
         </div>
+        <p className="muted" style={{ fontSize:'.82rem', margin:'0 0 var(--s-3)' }}>Min, maks ve adım değerleri 1.000 ile 100.000 arasında ve 1.000’in katı olmalıdır (min ≤ maks). Aksi hâlde kayıt reddedilir.</p>
         <label style={{ display:'inline-flex', gap:'.5rem', alignItems:'center', marginTop:'var(--s-3)' }}>
           <input type="checkbox" checked={p.isActive} onChange={e=>setP(s=>({...s,isActive:e.target.checked}))} /> Yayında
         </label>

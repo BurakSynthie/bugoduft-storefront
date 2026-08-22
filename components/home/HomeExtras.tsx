@@ -185,59 +185,74 @@ export function FaqGrouped({ locale, hc }:{ locale:Locale; hc:HomeExtra }) {
   );
 }
 
-export function SupportCta({ locale, hc, whatsapp }:{ locale:Locale; hc:HomeExtra; whatsapp?: string }) {
+type RoleContact = { email?: string; whatsapp?: string; phone?: string };
+export function SupportCta({ locale, hc, grafik, service }:
+  { locale:Locale; hc:HomeExtra; grafik?: RoleContact; service?: RoleContact }) {
   const t = chrome(locale, hc.sections);
-  // §2 SINGLE SOURCE: the actual WhatsApp destination comes from global Admin → Ayarlar
-  // contact settings — NOT from duplicated homepage-CMS values. The CMS still controls the
-  // card titles, "for" items and labels (business copy), just not the contact destination.
-  const waDigits = (whatsapp || '').replace(/\D/g, '');
-  const card = (c: HomeExtra['support']['grafik']) => (
-    <div className="supportcard" key={c.title}>
-      <h3>{c.title}</h3>
-      <p className="muted" style={{ fontSize:'.85rem' }}>{t.supForLabel}: {c.forItems.join(' · ')}</p>
-      {waDigits && (
-        <a className="supportcard__wa" href={`https://wa.me/${waDigits}`} target="_blank" rel="noopener noreferrer">
-          <IconCheck size={16} /> {t.supWaText}
-        </a>
-      )}
-    </div>
-  );
+  // §9 ROLE-SPECIFIC contacts. Each support card wires to its OWN email, WhatsApp destination
+  // and display phone from Admin → Ayarlar (Grafik & Design vs Kundenservice), falling back to
+  // the per-role seed value — the two roles are NEVER merged onto one shared destination. The
+  // CMS still controls the card titles, "for" items and labels (business copy).
+  const card = (c: HomeExtra['support']['grafik'], rc: RoleContact | undefined) => {
+    const waDigits = (rc?.whatsapp || c.whatsapp || '').replace(/\D/g, '');
+    const email = (rc?.email || '').trim();
+    const phone = (rc?.phone || c.display || '').trim();
+    return (
+      <div className="supportcard" key={c.title}>
+        <h3>{c.title}</h3>
+        <p className="muted" style={{ fontSize:'.85rem' }}>{t.supForLabel}: {c.forItems.join(' · ')}</p>
+        {waDigits && (
+          <a className="supportcard__wa" href={`https://wa.me/${waDigits}`} target="_blank" rel="noopener noreferrer">
+            <IconCheck size={16} /> {t.supWaText}
+          </a>
+        )}
+        {(email || phone) && (
+          <p className="supportcard__meta muted" style={{ fontSize:'.82rem', marginTop:'.5rem' }}>
+            {email && <a href={`mailto:${email}`}>{email}</a>}
+            {email && phone && <span aria-hidden="true"> · </span>}
+            {phone && <a href={`tel:${phone.replace(/[^\d+]/g, '')}`}>{phone}</a>}
+          </p>
+        )}
+      </div>
+    );
+  };
   return (
     <section className="section" id="kontakt">
       <Container>
         <div className="supportcta">
           <div><h2 className="h2">{t.supTitle}</h2><p className="lede">{t.supBody}</p></div>
-          <div className="supportgrid">{card(hc.support.grafik)}{card(hc.support.kundenservice)}</div>
+          <div className="supportgrid">{card(hc.support.grafik, grafik)}{card(hc.support.kundenservice, service)}</div>
         </div>
       </Container>
     </section>
   );
 }
 
-export function BlogPreview({ locale, hc }:{ locale:Locale; hc:HomeExtra }) {
-  if (!hc.blog.length) return null;   // §26 hide when empty
+// §13 Homepage Blog preview — wired to the real published Blog repository. `posts` are the
+// latest published articles for the current locale (server-fetched in app/[locale]/page.tsx).
+// When there are no published posts the section stays HIDDEN (preserves prior behavior; no
+// fake/demo content). "View all" links to the real /[locale]/blog index.
+export type BlogPreviewItem = { href: string; title: string; excerpt: string; image: string | null; category?: string };
+export function BlogPreview({ locale, hc, posts }:{ locale:Locale; hc:HomeExtra; posts: BlogPreviewItem[] }) {
+  if (!posts.length) return null;     // §13 hide when empty
   const t = chrome(locale, hc.sections);
   return (
     <section className="section section--subtle" id="blog">
       <Container>
         <SectionHeader eyebrow={t.blogEye} title={t.blogTitle} />
-        {hc.blog.length ? (
-          <>
-          <div className="grid grid-3">
-            {hc.blog.slice(0,3).map((p,i)=>(
-              <Link className="card" href={p.href} key={i} style={{ overflow:'hidden' }}>
-                <div className="blogcard__media">{p.image ? <img src={p.image} alt={p.title} loading="lazy"/> : null}</div>
-                <div style={{ padding:'var(--s-5)' }}>
-                  {p.category && <span className="badge">{p.category}</span>}
-                  <h3 style={{ fontSize:'1.05rem', marginTop:'.4rem' }}>{p.title}</h3>
-                  <p className="muted" style={{ fontSize:'.9rem', marginTop:'.3rem' }}>{p.excerpt}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-          <div style={{ marginTop:'var(--s-5)' }}><Button href={`/${locale}#blog`} variant="ghost">{t.blogAll}</Button></div>
-          </>
-        ) : <div className="emptybox">{t.blogEmpty}</div>}
+        <div className="grid grid-3">
+          {posts.slice(0,3).map((p,i)=>(
+            <Link className="card" href={p.href} key={i} style={{ overflow:'hidden' }}>
+              <div className="blogcard__media">{p.image ? <img src={p.image} alt={p.title} loading="lazy"/> : null}</div>
+              <div style={{ padding:'var(--s-5)' }}>
+                {p.category && <span className="badge">{p.category}</span>}
+                <h3 style={{ fontSize:'1.05rem', marginTop:'.4rem' }}>{p.title}</h3>
+                {p.excerpt && <p className="muted" style={{ fontSize:'.9rem', marginTop:'.3rem' }}>{p.excerpt}</p>}
+              </div>
+            </Link>
+          ))}
+        </div>
+        <div style={{ marginTop:'var(--s-5)' }}><Button href={`/${locale}/blog`} variant="ghost">{t.blogAll}</Button></div>
       </Container>
     </section>
   );

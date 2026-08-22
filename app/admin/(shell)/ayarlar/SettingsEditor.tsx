@@ -24,6 +24,18 @@ export default function SettingsEditor({ initial, configured }:{ initial: SiteSe
   const setSeoHome = (k: keyof SiteSettings['seo']['home'], l: Locale, val: string) => setS(v => ({ ...v, seo: { ...v.seo, home: { ...v.seo.home, [k]: { ...v.seo.home[k], [l]: val } } } }));
   const setPaidSample = (patch: Partial<SiteSettings['commerce']['paidSample']>) => setS(v => ({ ...v, commerce: { ...v.commerce, paidSample: { ...v.commerce.paidSample, ...patch } } }));
   const setFirstOrder = (patch: Partial<SiteSettings['commerce']['firstOrder']>) => setS(v => ({ ...v, commerce: { ...v.commerce, firstOrder: { ...v.commerce.firstOrder, ...patch } } }));
+  // Launch admin setters
+  const setBrand = (patch: Partial<SiteSettings['brand']>) => setS(v => ({ ...v, brand: { ...v.brand, ...patch } }));
+  const setNav = (k: keyof SiteSettings['navLabels'], l: Locale, val: string) => setS(v => ({ ...v, navLabels: { ...v.navLabels, [k]: { ...v.navLabels[k], [l]: val } } }));
+  const setAnnHref = (l: Locale, val: string) => setS(v => ({ ...v, announcement: { ...v.announcement, hrefL10n: { ...v.announcement.hrefL10n, [l]: val } } }));
+  const setGraphic = (patch: Partial<SiteSettings['contact']['graphic']>) => setS(v => ({ ...v, contact: { ...v.contact, graphic: { ...v.contact.graphic, ...patch } } }));
+  const setService = (patch: Partial<SiteSettings['contact']['service']>) => setS(v => ({ ...v, contact: { ...v.contact, service: { ...v.contact.service, ...patch } } }));
+  const setBF = (patch: Partial<SiteSettings['businessFacts']>) => setS(v => ({ ...v, businessFacts: { ...v.businessFacts, ...patch } }));
+  const setBFText = (k: 'originLabel'|'deliveryRegion', l: Locale, val: string) => setS(v => ({ ...v, businessFacts: { ...v.businessFacts, [k]: { ...v.businessFacts[k], [l]: val } } }));
+  const numFrom = (raw: string) => parseInt(raw.replace(/\D/g, ''), 10) || 0;
+  const [pickLogo, setPickLogo] = useState(false);
+  const [pickFav, setPickFav] = useState(false);
+  const [pickApple, setPickApple] = useState(false);
   const eurToCents = (raw: string) => Math.round((parseFloat(raw.replace(',', '.')) || 0) * 100);
   const centsToEur = (c: number) => (c / 100).toFixed(2);
 
@@ -53,8 +65,9 @@ export default function SettingsEditor({ initial, configured }:{ initial: SiteSe
         <div className="field"><label>Metin ({tab.toUpperCase()})</label><input className="input" value={s.announcement.text[tab]} onChange={e=>setAnnText('text', tab, e.target.value)} /></div>
         <div className="adm-grid2">
           <div className="field"><label>Bağlantı etiketi ({tab.toUpperCase()})</label><input className="input" value={s.announcement.linkLabel[tab]} onChange={e=>setAnnText('linkLabel', tab, e.target.value)} /></div>
-          <div className="field"><label>Bağlantı (URL)</label><input className="input" value={s.announcement.href} onChange={e=>setAnn({href:e.target.value})} placeholder="/de/produkte veya https://…" /></div>
+          <div className="field"><label>Bağlantı ({tab.toUpperCase()} — locale rotası)</label><input className="input" value={s.announcement.hrefL10n[tab]} onChange={e=>setAnnHref(tab, e.target.value)} placeholder={`/${tab}/produkte`} /><small className="muted">Her dil kendi rotasına gider. Boşsa aşağıdaki genel bağlantı kullanılır.</small></div>
         </div>
+        <div className="field"><label>Genel bağlantı (yedek)</label><input className="input" value={s.announcement.href} onChange={e=>setAnn({href:e.target.value})} placeholder="/de/produkte veya https://…" /></div>
       </div>
 
       {/* contact / social */}
@@ -71,16 +84,95 @@ export default function SettingsEditor({ initial, configured }:{ initial: SiteSe
         <p className="muted" style={{ fontSize:'.82rem' }}>Boş sosyal alan storefront’ta bağlantı olarak görünmez. Sırlar/anahtarlar burada saklanmaz.</p>
       </div>
 
-      {/* brand identity / OG */}
+      {/* role-specific contacts (Grafik & Design vs Kundenservice) */}
+      <div className="adm-panel">
+        <strong>Rol bazlı iletişim (Grafik & Kundenservice)</strong>
+        <p className="muted" style={{ fontSize:'.82rem', margin:'.3rem 0 var(--s-3)' }}>Ana sayfadaki destek kartları AYRI numaralara/adreslere gider — ikisi tek numarayı paylaşmaz.</p>
+        <div className="adm-grid2">
+          <div>
+            <div style={{ fontWeight:600, marginBottom:'.4rem' }}>Grafik & Design</div>
+            <div className="field"><label>E-posta</label><input className="input" value={s.contact.graphic.email} onChange={e=>setGraphic({email:e.target.value})} placeholder="grafik@bugoduft.de" /></div>
+            <div className="field"><label>WhatsApp hedefi</label><input className="input" value={s.contact.graphic.whatsapp} onChange={e=>setGraphic({whatsapp:e.target.value})} placeholder="+90 507 296 61 75" /></div>
+            <div className="field"><label>Görünen telefon</label><input className="input" value={s.contact.graphic.phone} onChange={e=>setGraphic({phone:e.target.value})} /></div>
+          </div>
+          <div>
+            <div style={{ fontWeight:600, marginBottom:'.4rem' }}>Kundenservice</div>
+            <div className="field"><label>E-posta</label><input className="input" value={s.contact.service.email} onChange={e=>setService({email:e.target.value})} placeholder="kundenservice@bugoduft.de" /></div>
+            <div className="field"><label>WhatsApp hedefi</label><input className="input" value={s.contact.service.whatsapp} onChange={e=>setService({whatsapp:e.target.value})} placeholder="+90 531 723 48 01" /></div>
+            <div className="field"><label>Görünen telefon</label><input className="input" value={s.contact.service.phone} onChange={e=>setService({phone:e.target.value})} /></div>
+          </div>
+        </div>
+      </div>
+
+      {/* central business facts */}
+      <div className="adm-panel">
+        <strong>Ticari / İşletme Bilgileri (tek kaynak)</strong>
+        <p className="muted" style={{ fontSize:'.82rem', margin:'.3rem 0 var(--s-3)' }}>Launch için kritik olgusal değerler. Bilgilendirici içeriği besler; checkout fiyatlandırması bu alanlardan ETKİLENMEZ.</p>
+        <div className="adm-grid2">
+          <div className="field"><label>Min. sipariş adedi</label><input className="input" inputMode="numeric" value={s.businessFacts.minOrderQty} onChange={e=>setBF({minOrderQty:numFrom(e.target.value)})} /></div>
+          <div className="field"><label>Adım (adet)</label><input className="input" inputMode="numeric" value={s.businessFacts.qtyStep} onChange={e=>setBF({qtyStep:numFrom(e.target.value)})} /></div>
+          <div className="field"><label>Üretim min (iş günü)</label><input className="input" inputMode="numeric" value={s.businessFacts.productionMinDays} onChange={e=>setBF({productionMinDays:numFrom(e.target.value)})} /></div>
+          <div className="field"><label>Üretim maks (iş günü)</label><input className="input" inputMode="numeric" value={s.businessFacts.productionMaxDays} onChange={e=>setBF({productionMaxDays:numFrom(e.target.value)})} /></div>
+          <div className="field"><label>Teslimat min (iş günü)</label><input className="input" inputMode="numeric" value={s.businessFacts.deliveryMinDays} onChange={e=>setBF({deliveryMinDays:numFrom(e.target.value)})} /></div>
+          <div className="field"><label>Teslimat maks (iş günü)</label><input className="input" inputMode="numeric" value={s.businessFacts.deliveryMaxDays} onChange={e=>setBF({deliveryMaxDays:numFrom(e.target.value)})} /></div>
+          <div className="field"><label>Yıllık deneyim</label><input className="input" value={s.businessFacts.yearsExperience} onChange={e=>setBF({yearsExperience:e.target.value})} placeholder="12+" /></div>
+          <div className="field"><label>Aylık kapasite</label><input className="input" value={s.businessFacts.monthlyCapacity} onChange={e=>setBF({monthlyCapacity:e.target.value})} placeholder="4 Mio." /></div>
+          <div className="field"><label>Ücretsiz numune eşiği (adet)</label><input className="input" inputMode="numeric" value={s.sample.threshold} onChange={e=>setS(v=>({...v, sample:{...v.sample, threshold:numFrom(e.target.value)}}))} /><small className="muted">Tek kaynak: ücretsiz 5.000+ numune kuralını yönetir.</small></div>
+          <div className="field"><label>Ücretli numune fiyatı (€)</label><input className="input" inputMode="numeric" value={Math.round(s.commerce.paidSample.priceCents/100)} onChange={e=>setPaidSample({priceCents:numFrom(e.target.value)*100})} /><small className="muted">Tek kaynak: €40 ücretli numune.</small></div>
+          <div className="field"><label>Ücretli numune kredisi (€)</label><input className="input" inputMode="numeric" value={Math.round(s.commerce.paidSample.creditCents/100)} onChange={e=>setPaidSample({creditCents:numFrom(e.target.value)*100})} /><small className="muted">Tek kaynak: €20 tek seferlik kredi.</small></div>
+        </div>
+        <div className="adm-tabs" role="tablist" style={{ marginTop:'var(--s-3)' }}>{TABS.map(t=><button key={t.id} role="tab" aria-selected={tab===t.id} className="adm-tab" onClick={()=>setTab(t.id)}>{t.label}</button>)}</div>
+        <div className="adm-grid2">
+          <div className="field"><label>Menşe/üretim ifadesi ({tab.toUpperCase()})</label><input className="input" value={s.businessFacts.originLabel[tab]} onChange={e=>setBFText('originLabel', tab, e.target.value)} /></div>
+          <div className="field"><label>Teslimat bölgesi ({tab.toUpperCase()})</label><input className="input" value={s.businessFacts.deliveryRegion[tab]} onChange={e=>setBFText('deliveryRegion', tab, e.target.value)} /></div>
+        </div>
+        <div style={{ display:'flex', gap:'1.2rem', flexWrap:'wrap', marginTop:'var(--s-3)' }}>
+          <label style={{ display:'inline-flex', gap:'.4rem', alignItems:'center' }}><input type="checkbox" checked={s.businessFacts.shippingIncluded} onChange={e=>setBF({shippingIncluded:e.target.checked})} /> Kargo dahil</label>
+          <label style={{ display:'inline-flex', gap:'.4rem', alignItems:'center' }}><input type="checkbox" checked={s.businessFacts.customsIncluded} onChange={e=>setBF({customsIncluded:e.target.checked})} /> Gümrük dahil (uygun olduğunda)</label>
+        </div>
+      </div>
+
+      {/* brand identity / logo / favicon / OG */}
       <div className="adm-panel">
         <strong>Marka kimliği</strong>
         <div className="adm-grid2" style={{ marginTop:'var(--s-4)' }}>
-          <div className="field"><label>Marka adı</label><input className="input" value={s.brandName} onChange={e=>setS(v=>({...v, brandName:e.target.value}))} /></div>
+          <div className="field"><label>Marka adı</label><input className="input" value={s.brandName} onChange={e=>setS(v=>({...v, brandName:e.target.value}))} /><small className="muted">Header, footer, telif, meta başlık şablonu, OpenGraph, şema ve logo alt metninde kullanılır.</small></div>
           <div className="field"><label>Varsayılan OG görseli</label>
             {s.defaultOgImage
               ? <div className="media-slot"><img src={s.defaultOgImage} alt="" /><div className="media-slot__act"><button className="linkbtn" onClick={()=>setPickOg(true)}>Değiştir</button><button className="linkbtn" style={{color:'#B42318'}} onClick={()=>setS(v=>({...v, defaultOgImage:null}))}>Kaldır</button></div></div>
               : <button className="adm-btn adm-btn--ghost" onClick={()=>setPickOg(true)}>Seç / Yükle</button>}
           </div>
+          <div className="field"><label>Logo (isteğe bağlı)</label>
+            {s.brand.logo
+              ? <div className="media-slot"><img src={s.brand.logo} alt="" /><div className="media-slot__act"><button className="linkbtn" onClick={()=>setPickLogo(true)}>Değiştir</button><button className="linkbtn" style={{color:'#B42318'}} onClick={()=>setBrand({logo:null})}>Kaldır</button></div></div>
+              : <button className="adm-btn adm-btn--ghost" onClick={()=>setPickLogo(true)}>Seç / Yükle</button>}
+            <small className="muted">Boşsa marka adı metni kullanılır.</small>
+          </div>
+          <div className="field"><label>Favicon</label>
+            {s.brand.favicon
+              ? <div className="media-slot"><img src={s.brand.favicon} alt="" /><div className="media-slot__act"><button className="linkbtn" onClick={()=>setPickFav(true)}>Değiştir</button><button className="linkbtn" style={{color:'#B42318'}} onClick={()=>setBrand({favicon:null})}>Kaldır</button></div></div>
+              : <button className="adm-btn adm-btn--ghost" onClick={()=>setPickFav(true)}>Seç / Yükle</button>}
+            <small className="muted">Boşsa varsayılan /favicon.svg kullanılır. PNG/JPG/WebP.</small>
+          </div>
+          <div className="field"><label>Apple touch simgesi</label>
+            {s.brand.appleTouchIcon
+              ? <div className="media-slot"><img src={s.brand.appleTouchIcon} alt="" /><div className="media-slot__act"><button className="linkbtn" onClick={()=>setPickApple(true)}>Değiştir</button><button className="linkbtn" style={{color:'#B42318'}} onClick={()=>setBrand({appleTouchIcon:null})}>Kaldır</button></div></div>
+              : <button className="adm-btn adm-btn--ghost" onClick={()=>setPickApple(true)}>Seç / Yükle</button>}
+            <small className="muted">iOS ana ekran simgesi (PNG önerilir).</small>
+          </div>
+        </div>
+      </div>
+
+      {/* navigation labels (DE/EN/FR) */}
+      <div className="adm-panel">
+        <strong>Navigasyon etiketleri (DE / EN / FR)</strong>
+        <p className="muted" style={{ fontSize:'.82rem', margin:'.3rem 0 var(--s-3)' }}>Yalnızca görünen etiketler düzenlenir; rotalar sabittir. Boş etiket için varsayılan çeviri kullanılır.</p>
+        <div className="adm-tabs" role="tablist">{TABS.map(t=><button key={t.id} role="tab" aria-selected={tab===t.id} className="adm-tab" onClick={()=>setTab(t.id)}>{t.label}</button>)}</div>
+        <div className="adm-grid2">
+          {(['products','scents','industries','sample','production','faq'] as const).map(k => (
+            <div className="field" key={k}><label>{k} ({tab.toUpperCase()})</label>
+              <input className="input" value={s.navLabels[k][tab]} onChange={e=>setNav(k, tab, e.target.value)} /></div>
+          ))}
         </div>
       </div>
 
@@ -197,6 +289,9 @@ export default function SettingsEditor({ initial, configured }:{ initial: SiteSe
       </div>
 
       {pickOg && <MediaPicker type="image" onSelect={(m: MediaRecord)=>setS(v=>({...v, defaultOgImage:m.url}))} onClose={()=>setPickOg(false)} />}
+      {pickLogo && <MediaPicker type="image" onSelect={(m: MediaRecord)=>setBrand({logo:m.url})} onClose={()=>setPickLogo(false)} />}
+      {pickFav && <MediaPicker type="image" onSelect={(m: MediaRecord)=>setBrand({favicon:m.url})} onClose={()=>setPickFav(false)} />}
+      {pickApple && <MediaPicker type="image" onSelect={(m: MediaRecord)=>setBrand({appleTouchIcon:m.url})} onClose={()=>setPickApple(false)} />}
     </>
   );
 }

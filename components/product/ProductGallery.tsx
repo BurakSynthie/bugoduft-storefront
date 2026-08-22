@@ -5,17 +5,21 @@ import { useState } from 'react';
 // no navigation, no layout shift). Preserves the existing .pdp__visual / .pdp__cover /
 // .pdp__gallery / .pdp__thumb design. Video media is supported (muted/autoplay/playsInline,
 // per current design) and stops when switched away because React unmounts the element.
-type Media = { type: 'image' | 'video'; src: string };
+type Media = { type: 'image' | 'video'; src: string; alt: string | null };
 const isVideo = (s: string) => /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(s);
 
-export default function ProductGallery({ cover, coverAlt, gallery, collectionCode, name }:
-  { cover: string | null; coverAlt: string | null; gallery: string[]; collectionCode: string; name: string }) {
+export default function ProductGallery({ cover, coverAlt, gallery, galleryAlt, collectionCode, name }:
+  { cover: string | null; coverAlt: string | null; gallery: string[]; galleryAlt?: (string | null)[]; collectionCode: string; name: string }) {
   const media: Media[] = [];
-  if (cover) media.push({ type: isVideo(cover) ? 'video' : 'image', src: cover });
-  for (const g of gallery) media.push({ type: isVideo(g) ? 'video' : 'image', src: g });
+  if (cover) media.push({ type: isVideo(cover) ? 'video' : 'image', src: cover, alt: coverAlt });
+  // §10 each gallery image carries its own locale-specific ALT (alt_de/en/fr resolved server-side).
+  gallery.forEach((g, idx) => media.push({ type: isVideo(g) ? 'video' : 'image', src: g, alt: galleryAlt?.[idx] ?? null }));
 
   const [i, setI] = useState(0);
   const active = media[i];
+  // The active large image renders with ITS OWN ALT; fall back to the product name so the
+  // main product visual is never alt-less. Thumbnails stay decorative (empty alt).
+  const activeAlt = active?.alt || name;
 
   return (
     <>
@@ -24,7 +28,7 @@ export default function ProductGallery({ cover, coverAlt, gallery, collectionCod
           ? <div className="hero__tag"><small>Your logo</small><b>{collectionCode}</b></div>
           : active.type === 'video'
             ? <video className="pdp__cover" src={active.src} autoPlay muted playsInline loop />
-            : <img className="pdp__cover" src={active.src} alt={coverAlt ?? name} />}
+            : <img className="pdp__cover" src={active.src} alt={activeAlt} />}
       </div>
       {media.length > 1 && (
         <div className="pdp__gallery" role="tablist" aria-label={name}>

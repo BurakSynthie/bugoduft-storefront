@@ -1,5 +1,6 @@
 import type { Locale } from '@/i18n/config';
 import type { Intensity, ShapeId } from '@/lib/configurator/types';
+import type { DesignMode } from '@/lib/configurator/design-mode';
 import type { FileMeta } from '@/lib/configurator/draft';
 
 // One configured BUGO production item. Serializable: references + a display
@@ -17,6 +18,9 @@ export type CartItem = {
   scentCode2: string | null;
   scentName2: string | null;
   intensity: Intensity;
+  // §P0-3 — the customer's design choice must survive into the cart; a genuine ready_file
+  // selection must never be silently defaulted to bugo_creates at checkout.
+  designMode: DesignMode;
   shape: ShapeId;
   shapeLabel: string;
   frontName: string | null;

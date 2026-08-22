@@ -4,7 +4,7 @@ import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/s
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { getCustomerUser } from '@/lib/customer/session';
 import { finalizeCheckout } from '@/app/actions/checkout';
-import type { IncomingConfig } from '@/repositories/configurations';
+import { validateAndPrice, upsertConfiguration, type IncomingConfig } from '@/repositories/configurations';
 
 export type ReorderResult =
   | { ok: true; checkoutUrl: string }
@@ -70,6 +70,23 @@ export async function beginReorder(orderId: string): Promise<ReorderResult> {
     backPath: source.same_back_as_front ? null : (source.back_path ?? null),
     supporting: Array.isArray(source.supporting) ? source.supporting : [],
   };
+
+  // §HIGH-7 REORDER LIFECYCLE: the checkout lease (claim_config_checkout) can only lock a
+  // configuration row that already EXISTS. A reorder mints a brand-new configId, so we must
+  // persist a validated configuration row FIRST (server-recomputed price, artwork paths carried
+  // forward) — then finalizeCheckout can acquire the lease exactly like a normal checkout. Without
+  // this the new reorder would fail as "checkout already in progress" (lease on a missing row).
+  // The SAME payment-safety invariants therefore apply to reorder and normal checkout alike.
+  const priced = await validateAndPrice(cfg);
+  if (!priced.ok) {
+    console.error('[reorder] validate/price failed:', priced.error);
+    return { ok: false, code: 'invalid', message: 'Die Bestellung kann derzeit nicht wiederholt werden.' };
+  }
+  const seeded = await upsertConfiguration({ ...cfg, ...priced, ...paths, status: 'draft' });
+  if (!seeded.ok) {
+    console.error('[reorder] seed configuration failed:', seeded.message);
+    return { ok: false, code: 'error', message: 'Die Bestellung kann derzeit nicht wiederholt werden.' };
+  }
 
   const result = await finalizeCheckout(cfg, paths);
   if (!result.ok) return result;

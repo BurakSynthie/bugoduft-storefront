@@ -6,6 +6,7 @@ import { products } from '@/data/seed/products';
 import { scents } from '@/data/seed/scents';
 import { industries } from '@/data/seed/industries';
 import type { ProductSeed, ScentSeed } from '@/data/types';
+import { priceFromForMinQty } from '@/lib/pricing/tiers';
 
 export type ProductView = {
   id: string; code: string; collectionCode: string; groupId: string;
@@ -14,13 +15,18 @@ export type ProductView = {
   basePriceCents: number; currency: 'EUR'; priceFromCents: number;
   minQty: number; maxQty: number; qtyStep: number;
   tiers: ProductSeed['tiers']; options: ProductSeed['options']; scentCodes: string[];
-  coverImage: string | null; gallery: string[]; video: string | null; poster: string | null; coverAlt: string | null;
+  coverImage: string | null; gallery: string[]; galleryAlt: (string | null)[]; video: string | null; poster: string | null; coverAlt: string | null;
   badge: string | null; features: string[]; useCase: string | null;
   productionInfo: string | null; deliveryInfo: string | null; moqText: string | null;
   compareAtCents: number | null; promoActive: boolean; promoBadge: string | null;
 };
 
-function priceFrom(p: ProductSeed) { return Math.min(p.basePriceCents, ...p.tiers.map(t => t.unitPriceCents)); }
+// §P0-1: starting ("ab") price is the rate applicable to the product's MINIMUM order
+// quantity — NOT the cheapest bulk tier. Bulk discounts only apply once that qty is chosen.
+// Uses the same centralized rule as the DB reader so the two can never drift.
+function priceFrom(p: ProductSeed) {
+  return priceFromForMinQty(p.tiers.map(t => ({ minQty: t.minQty, ratePer1000Cents: t.unitPriceCents })), p.minQty, p.basePriceCents);
+}
 
 export function toProductView(p: ProductSeed, locale: Locale): ProductView {
   const t = p.tr[locale];
@@ -28,7 +34,9 @@ export function toProductView(p: ProductSeed, locale: Locale): ProductView {
     name:t.name, slug:t.slug, h1:t.h1, shortDesc:t.shortDesc, longDesc:t.longDesc, seo:t.seo,
     basePriceCents:p.basePriceCents, currency:p.currency, priceFromCents:priceFrom(p),
     minQty:p.minQty, maxQty:p.maxQty, qtyStep:p.qtyStep, tiers:p.tiers, options:p.options, scentCodes:p.scentCodes,
-    coverImage:p.media?.cover ?? null, gallery:p.media?.gallery ?? [], video:p.media?.video ?? null,
+    coverImage:p.media?.cover ?? null, gallery:p.media?.gallery ?? [],
+    galleryAlt:(p.media?.gallery ?? []).map(() => null),   // seed gallery carries no per-image ALT
+    video:p.media?.video ?? null,
     poster:p.media?.poster ?? null, coverAlt:p.media?.alt?.[locale] ?? null,
     badge:null, features:[], useCase:null, productionInfo:null, deliveryInfo:null, moqText:null,
     compareAtCents:null, promoActive:false, promoBadge:null };

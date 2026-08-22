@@ -152,3 +152,6 @@ body.adm-lock{overflow:hidden}
 @media(max-width:560px){.adm-dl{grid-template-columns:1fr}}
 
 .adm-stack{display:grid;gap:var(--s-5)}
+
+/* Blog editor field labels (reuse global .field layout with bold labels). */
+.field .field-lbl{font-size:.85rem;font-weight:600}

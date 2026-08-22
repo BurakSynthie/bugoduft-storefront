@@ -9,13 +9,13 @@ import ProdVideo from '@/components/home/ProdVideo';
 
 const COPY = {
   de:{ head:'Individuelle Duftanhänger für Ihre Marke.',
-       sub:'Professionell produziert, individuell gestaltet und weltweit geliefert.',
+       sub:'Professionell produziert, individuell gestaltet und europaweit geliefert.',
        secondary:'Produkte entdecken', finalPrice:'Ihr angezeigter Preis ist der finale BUGO-Preis.' },
   en:{ head:'Custom air fresheners for your brand.',
-       sub:'Professionally produced, individually designed and shipped worldwide.',
+       sub:'Professionally produced, individually designed and delivered Europe-wide.',
        secondary:'Explore products', finalPrice:'The price shown is your final BUGO price.' },
   fr:{ head:'Désodorisants personnalisés pour votre marque.',
-       sub:'Production professionnelle, design sur mesure, livraison mondiale.',
+       sub:'Production professionnelle, design sur mesure, livraison en Europe.',
        secondary:'Découvrir les produits', finalPrice:'Le prix affiché est votre prix BUGO final.' },
 } as const;
 

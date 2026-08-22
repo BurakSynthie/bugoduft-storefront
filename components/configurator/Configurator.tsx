@@ -4,8 +4,7 @@ import { useRouter } from 'next/navigation';
 import type { Locale } from '@/i18n/config';
 import { formatMoney, formatQty } from '@/lib/money';
 import { validateQuantity, quantityMessage } from '@/lib/quantity';
-import { totalCents } from '@/lib/configurator/pricing';
-import { priceQuantity, type PriceTier } from '@/lib/pricing/tiers';
+import { priceQuantitySafe, type PriceTier } from '@/lib/pricing/tiers';
 import type { ArtworkRef, BugoConfiguration, Intensity, ShapeId } from '@/lib/configurator/types';
 import { firstConfigError, type ConfigError } from '@/lib/configurator/pricing';
 import { SHAPES, isDeferred, shapeGeometry } from '@/lib/configurator/shapes';
@@ -20,7 +19,9 @@ import {
   metaOf, refFromMeta, setFrontFile, setBackFile, setSupportingFiles, hasSessionFiles, type CfgDraft,
 } from '@/lib/configurator/draft';
 
-export type CfgCollection = { collectionCode:string; collectionName:string; productId:string; basePriceCents:number; scentCodes:string[]; tiers?:PriceTier[] };
+export type CfgCollection = { collectionCode:string; collectionName:string; productId:string; basePriceCents:number; scentCodes:string[]; tiers?:PriceTier[];
+  // §HIGH-4 per-product intensive-fragrance rate (€/1.000) and §HIGH-6 per-product quantity rules.
+  intenseCents?:number; minQty?:number; maxQty?:number; qtyStep?:number };
 export type CfgScent = { code:string; category:string; name:string; description:string };
 
 const QUICK = [1000,2000,5000,10000,25000,50000,100000];
@@ -51,7 +52,7 @@ const L = {
     previewNote:'Die Vorschau dient zur Orientierung. Die finale Druckdatei wird von unserem Designteam geprüft.',
     deferredNote:'Die finale Produktionsform wird von unserem Designteam anhand Ihrer Datei vorbereitet.',
     yourLogo:'Ihr Logo', step:'Schritt', of:'von', chooseScent:'Bitte wählen Sie einen Duft.', all:'Alle',
-    surchargeHint:'einmalig +30,00 € pro Konfiguration', done:'Konfiguration bereit',
+    done:'Konfiguration bereit',
     doneNote:'Ihre Konfiguration ist vollständig und für den nächsten Schritt vorbereitet.', edit:'Bearbeiten',
     cord:'Kordel: Schwarz (fest)', finalPriceNote:'Ihr finaler BUGO-Preis — keine weiteren BUGO-Aufpreise danach.' },
   en:{ collection:'Collection', qty:'Quantity', qtyOther:'Other quantity', scent:'Scent', intensity:'Fragrance intensity',
@@ -65,7 +66,7 @@ const L = {
     previewNote:'The preview is for orientation only. The final print file is checked by our design team.',
     deferredNote:'The final production shape is prepared by our design team from your file.',
     yourLogo:'Your logo', step:'Step', of:'of', chooseScent:'Please choose a scent.', all:'All',
-    surchargeHint:'one-time +€30.00 per configuration', done:'Configuration ready',
+    done:'Configuration ready',
     doneNote:'Your configuration is complete and prepared for the next step.', edit:'Edit',
     cord:'Cord: black (fixed)', finalPriceNote:'Your final BUGO price — no further BUGO charges after this.' },
   fr:{ collection:'Collection', qty:'Quantité', qtyOther:'Autre quantité', scent:'Parfum', intensity:'Intensité du parfum',
@@ -79,7 +80,7 @@ const L = {
     previewNote:'L’aperçu est indicatif. Le fichier d’impression final est vérifié par notre équipe design.',
     deferredNote:'La forme de production finale est préparée par notre équipe design à partir de votre fichier.',
     yourLogo:'Votre logo', step:'Étape', of:'sur', chooseScent:'Veuillez choisir un parfum.', all:'Tous',
-    surchargeHint:'+30,00 € une seule fois par configuration', done:'Configuration prête',
+    done:'Configuration prête',
     doneNote:'Votre configuration est complète et préparée pour l’étape suivante.', edit:'Modifier',
     cord:'Cordon : noir (fixe)', finalPriceNote:'Votre prix BUGO final — aucun frais BUGO supplémentaire ensuite.' },
 } as const;
@@ -189,6 +190,12 @@ export default function Configurator({ locale, collections, scents, intenseCents
   const [back, setBack] = useState<ArtworkRef|null>(null);
   const [backNotes, setBackNotes] = useState('');
   const [supporting, setSupporting] = useState<ArtworkRef[]>([]);
+  // §HIGH-14 persisted artwork storage references carried through cart Edit + reload. Front/back
+  // paths live on the ArtworkRef.storagePath (set only when restored from a persisted cart item);
+  // supporting paths and the "already persisted" flag are tracked here so buildCartItem preserves
+  // them unless the user explicitly replaces/removes the upload.
+  const [supportingPaths, setSupportingPaths] = useState<{ field: string; path: string }[]>([]);
+  const [filesPersisted, setFilesPersisted] = useState(false);
   const [step, setStep] = useState(0);
   const [adding, setAdding] = useState(false);
   const [stepError, setStepError] = useState<string|null>(null);
@@ -210,9 +217,12 @@ export default function Configurator({ locale, collections, scents, intenseCents
     setScentCode2(d.scentCode2 ?? null); setShowSecond(!!d.scentCode2);
     if(d.designMode) setDesignMode(d.designMode);
     setIntensity(d.intensity); setShape(d.shape);
-    setFront(refFromMeta(d.frontMeta)); setFrontNotes(d.frontNotes || '');
-    setSameBack(d.sameBack); setBack(refFromMeta(d.backMeta)); setBackNotes(d.backNotes || '');
-    setSupporting(d.supportingMeta.map(refFromMeta).filter(Boolean) as ArtworkRef[]);
+    // §HIGH-14 restore persisted storage paths so an unchanged upload survives Edit/reload.
+    setFront(refFromMeta(d.frontMeta, d.frontPath ?? null)); setFrontNotes(d.frontNotes || '');
+    setSameBack(d.sameBack); setBack(refFromMeta(d.backMeta, d.backPath ?? null)); setBackNotes(d.backNotes || '');
+    setSupporting(d.supportingMeta.map(m => refFromMeta(m)).filter(Boolean) as ArtworkRef[]);
+    setSupportingPaths(d.supportingPaths ?? []);
+    setFilesPersisted(d.filesPersisted ?? false);
     setStep(Math.min(7, Math.max(0, d.step || 0)));
   }
   useEffect(()=>{
@@ -244,22 +254,39 @@ export default function Configurator({ locale, collections, scents, intenseCents
 
   const base = col?.basePriceCents ?? 0;
   const cfgTiers: PriceTier[] = (col?.tiers && col.tiers.length) ? col.tiers : [{ minQty:1000, ratePer1000Cents: base }];
-  const qp = priceQuantity(cfgTiers, quantity);
-  const surchargeCents = intensity === 'intense' ? intenseCents : 0;
+  // §HIGH-4 the intensive rate belongs to the SELECTED product (not products[0]); prop is the fallback.
+  const colIntenseCents = col?.intenseCents ?? intenseCents;
+  // §HIGH-6 the SELECTED product's quantity rules (fall back to the canonical envelope).
+  const qtyRules = { min: col?.minQty ?? 1000, max: col?.maxQty ?? 100000, step: col?.qtyStep ?? 1000 };
+  // §HIGH-11 quick buttons must match the product's real step-from-min rule (aligns to min, not 0).
+  const quickQtys = QUICK.filter(n => n >= qtyRules.min && n <= qtyRules.max && (n - qtyRules.min) % qtyRules.step === 0);
+  // §P0/HIGH-12 never invent a price when no tier covers the quantity (server is authoritative).
+  const qp = priceQuantitySafe(cfgTiers, quantity)
+    ?? { ratePer1000Cents: base, totalCents: 0, baseTotalCents: 0, savingsCents: 0, badge: null };
+  const surchargeCents = intensity === 'intense' ? Math.round(colIntenseCents * (quantity / 1000)) : 0;
   const unitRateCents = qp.ratePer1000Cents;
   const total = qp.totalCents + surchargeCents;          // full order total (display; server is authority)
   const savingsCents = qp.savingsCents;
   const freeSample = sampleThreshold > 0 && quantity >= sampleThreshold;
-  const qtyErr = validateQuantity(quantity, {min:1000,max:100000,step:1000});
+  const qtyErr = validateQuantity(quantity, qtyRules);
   const backArtwork = sameBack ? front : back;
+
+  // §HIGH-6 when switching to a product with stricter rules, clamp an out-of-range quantity
+  // to that product's minimum so the client never shows a quantity the server would reject.
+  useEffect(()=>{ if (hydrated && validateQuantity(quantity, qtyRules)) { setQuantity(qtyRules.min); setQtyText(''); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[collectionCode]);
 
   const Y = STEP_NAMES[locale].length;   // real step count (derived, not hardcoded)
 
   // ---- file registry wrappers (binaries never persisted to localStorage) ----
-  function chooseFront(r:ArtworkRef|null){ setFront(r); setFrontFile(configIdRef.current, r?.file ?? null); }
-  function chooseBack(r:ArtworkRef|null){ setBack(r); setBackFile(configIdRef.current, r?.file ?? null); }
-  function addSupporting(r:ArtworkRef){ setSupporting(s=>{ const n=[...s,r]; setSupportingFiles(configIdRef.current, n.map(x=>x.file??null)); return n; }); }
-  function removeSupporting(i:number){ setSupporting(s=>{ const n=s.filter((_,j)=>j!==i); setSupportingFiles(configIdRef.current, n.map(x=>x.file??null)); return n; }); }
+  // §HIGH-14 choosing a NEW binary means the stored path no longer represents current artwork →
+  // mark not-persisted so it is re-uploaded at add. A plain restore (r.storagePath set, no file)
+  // or an unrelated edit never clears an existing path.
+  function chooseFront(r:ArtworkRef|null){ setFront(r); setFrontFile(configIdRef.current, r?.file ?? null); if (r?.file) setFilesPersisted(false); }
+  function chooseBack(r:ArtworkRef|null){ setBack(r); setBackFile(configIdRef.current, r?.file ?? null); if (r?.file) setFilesPersisted(false); }
+  function addSupporting(r:ArtworkRef){ setSupporting(s=>{ const n=[...s,r]; setSupportingFiles(configIdRef.current, n.map(x=>x.file??null)); return n; }); setFilesPersisted(false); }
+  function removeSupporting(i:number){ setSupporting(s=>{ const n=s.filter((_,j)=>j!==i); setSupportingFiles(configIdRef.current, n.map(x=>x.file??null)); return n; }); setFilesPersisted(false); }
 
   function selectQuick(n:number){ setQuantity(n); setQtyText(''); }
   function applyQtyText(v:string){ setQtyText(v); const n=parseInt(v.replace(/\D/g,''),10); if(Number.isFinite(n)) setQuantity(n); }
@@ -278,6 +305,9 @@ export default function Configurator({ locale, collections, scents, intenseCents
     quantity, qtyText, scentCode, scentCode2, designMode, scentCat, intensity, shape,
     frontMeta: metaOf(front), frontNotes, sameBack, backMeta: metaOf(back), backNotes,
     supportingMeta: supporting.map(s=>({ name:s.name, type:s.type, size:s.size })),
+    // §HIGH-14 persist storage references + persisted flag in the autosaved draft.
+    frontPath: front?.storagePath ?? null, backPath: sameBack ? null : (back?.storagePath ?? null),
+    supportingPaths, filesPersisted,
     step, locale, updatedAt: Date.now(),
   });
 
@@ -289,7 +319,7 @@ export default function Configurator({ locale, collections, scents, intenseCents
     saveTimer.current = setTimeout(()=> saveDraft(currentDraft()), 300);
     return ()=>{ if (saveTimer.current) clearTimeout(saveTimer.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[hydrated, recover, collectionCode, quantity, qtyText, scentCode, scentCode2, designMode, scentCat, intensity, shape, front, frontNotes, sameBack, back, backNotes, supporting, step]);
+  },[hydrated, recover, collectionCode, quantity, qtyText, scentCode, scentCode2, designMode, scentCat, intensity, shape, front, frontNotes, sameBack, back, backNotes, supporting, supportingPaths, filesPersisted, step]);
 
   // clear inline step error when the relevant inputs / step change
   useEffect(()=>{ setStepError(null); },[step, front, frontNotes, back, backNotes, scentCode, quantity, sameBack]);
@@ -301,7 +331,7 @@ export default function Configurator({ locale, collections, scents, intenseCents
 
   // ---- validation ----
   function mobileStepError(s:number): string|null {
-    if (s===1 && qtyErr) return quantityMessage(qtyErr, locale);
+    if (s===1 && qtyErr) return quantityMessage(qtyErr, locale, qtyRules);
     if (s===2 && !scentCode) return t.chooseScent;
     if (s===5) { if (!front) return T.reqFrontFile; if (!frontNotes.trim()) return T.reqFrontNotes; }
     if (s===6 && !sameBack) { if (!back) return T.reqBackFile; if (!backNotes.trim()) return T.reqBackNotes; }
@@ -318,7 +348,7 @@ export default function Configurator({ locale, collections, scents, intenseCents
       case 'back_file': case 'back_instructions': return 6; default:return 7; }
   }
   function errMessage(e:ConfigError): string {
-    switch(e){ case 'quantity':return quantityMessage(qtyErr, locale) ?? '';
+    switch(e){ case 'quantity':return quantityMessage(qtyErr, locale, qtyRules) ?? '';
       case 'scent':return t.chooseScent;
       case 'front_file':return T.reqFrontFile; case 'front_instructions':return T.reqFrontNotes;
       case 'back_file':return T.reqBackFile; case 'back_instructions':return T.reqBackNotes; default:return ''; }
@@ -330,18 +360,23 @@ export default function Configurator({ locale, collections, scents, intenseCents
     return {
       cartItemId: `ci-${configIdRef.current}`, configId: configIdRef.current,
       productId: col.productId, collectionCode: col.collectionCode, collectionName: col.collectionName,
-      quantity, scentCode, scentName, scentCode2, scentName2, intensity, shape, shapeLabel: SHAPE_L[shape][locale],
+      quantity, scentCode, scentName, scentCode2, scentName2, intensity, designMode, shape, shapeLabel: SHAPE_L[shape][locale],
       frontName: front?.name ?? null, frontMeta: metaOf(front), frontInstructions: frontNotes,
       sameBackAsFront: sameBack,
       backName: sameBack ? null : (back?.name ?? null), backMeta: sameBack ? null : metaOf(back),
       backInstructions: sameBack ? '' : backNotes,
-      frontPath:null, backPath:null, supporting:[], filesPersisted:false,
+      // §HIGH-14 carry persisted storage references forward — never blindly null them. front/back
+      // paths come from the ArtworkRef.storagePath (restored on edit, null after explicit replace/
+      // remove); supporting paths + the persisted flag are tracked separately.
+      frontPath: front?.storagePath ?? null,
+      backPath: sameBack ? null : (back?.storagePath ?? null),
+      supporting: supportingPaths, filesPersisted,
       basePriceCents: base, surchargeCents, priceCents: total, currency:'EUR', locale, updatedAt: Date.now(),
     };
   }
   function addToCart(){
     if (adding) return;
-    const e = firstConfigError(buildConfig());
+    const e = firstConfigError(buildConfig(), qtyRules);
     if (e) { setStep(errStep(e)); setStepError(errMessage(e)); return; }
     setAdding(true);
     const item = buildCartItem();
@@ -351,10 +386,20 @@ export default function Configurator({ locale, collections, scents, intenseCents
     setExitOpen(false);
     cart.openCart();
     setAdding(false);
-    // best-effort: upload artwork to the configuration's storage so the cart holds path refs
-    persistItemFiles(item).then(res=>{
-      if (res.ok) cart.addOrUpdate({ ...item, frontPath:res.frontPath, backPath:res.backPath, supporting:res.supporting, filesPersisted:true });
-    }).catch(()=>{});
+    // §HIGH-14 only upload when there are NEW in-session binaries. After a reload there are none,
+    // so we must NOT run the upload path and overwrite preserved paths with nulls. When we do
+    // upload, MERGE: a freshly-uploaded path replaces; otherwise the existing item path is kept.
+    if (hasSessionFiles(configIdRef.current)) {
+      persistItemFiles(item).then(res=>{
+        if (res.ok) cart.addOrUpdate({
+          ...item,
+          frontPath: res.frontPath ?? item.frontPath,
+          backPath: res.backPath ?? item.backPath,
+          supporting: res.supporting.length ? res.supporting : item.supporting,
+          filesPersisted: true,
+        });
+      }).catch(()=>{});
+    }
   }
 
   // ---- recovery banner actions ----
@@ -363,6 +408,10 @@ export default function Configurator({ locale, collections, scents, intenseCents
     clearDraft(); const id = newConfigId(); configIdRef.current = id; setLive(id);
     setCollectionCode(collections[0]?.collectionCode); setQuantity(1000); setQtyText('');
     setScentCode(null); setScentCat('all'); setIntensity('normal'); setShape('rectangle');
+    // §MEDIUM-15 a reset must return to a GENUINE clean default — no stale second-scent, design
+    // mode, or upload/persistence state bleeding from the previous configuration.
+    setScentCode2(null); setShowSecond(false); setDesignMode('bugo_creates');
+    setSupportingPaths([]); setFilesPersisted(false);
     setFront(null); setFrontNotes(''); setSameBack(true); setBack(null); setBackNotes(''); setSupporting([]); setStep(0);
     setRecover(null);
   }
@@ -432,7 +481,7 @@ export default function Configurator({ locale, collections, scents, intenseCents
 
             {block(1, <><div className="cfg__legend">{t.qty}</div>
               <div className="qtygrid">
-                {QUICK.map(n=>(
+                {quickQtys.map(n=>(
                   <button key={n} type="button" className="qbtn" aria-pressed={quantity===n && !qtyText}
                     onClick={()=>selectQuick(n)}>{formatQty(n,locale)}</button>))}
               </div>
@@ -441,7 +490,7 @@ export default function Configurator({ locale, collections, scents, intenseCents
                 <input id="qty-other" className="input" inputMode="numeric" placeholder="z. B. 3.000"
                   value={qtyText} onChange={e=>applyQtyText(e.target.value)}/>
               </div>
-              {qtyErr && <p className="cfg-error" role="alert">{quantityMessage(qtyErr,locale)}</p>}
+              {qtyErr && <p className="cfg-error" role="alert">{quantityMessage(qtyErr,locale,qtyRules)}</p>}
               {!qtyErr && (
                 <div className="tierbox">
                   <div className="tierbox__row"><span>{formatQty(quantity,locale)} {t.pieces}</span><b>{formatMoney(unitRateCents,'EUR',locale)} / 1.000</b></div>
@@ -497,7 +546,7 @@ export default function Configurator({ locale, collections, scents, intenseCents
                 <button type="button" className="tile" aria-pressed={intensity==='normal'} onClick={()=>setIntensity('normal')}>
                   <b>{t.normal}</b><small>+0,00 €</small></button>
                 <button type="button" className="tile" aria-pressed={intensity==='intense'} onClick={()=>setIntensity('intense')}>
-                  <b>{t.intense}</b><small>{t.surchargeHint}</small></button>
+                  <b>{t.intense}</b><small>+{formatMoney(colIntenseCents,'EUR',locale)} / 1.000</small></button>
               </div></>)}
 
             {block(4, <><div className="cfg__legend">{t.shape}</div>

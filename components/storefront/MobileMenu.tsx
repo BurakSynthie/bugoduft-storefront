@@ -10,8 +10,9 @@ import type { Locale } from '@/i18n/config';
 import LanguageSwitcher from '@/components/layout/LanguageSwitcher';
 import CurrencySwitcher from '@/components/layout/CurrencySwitcher';
 
-export default function MobileMenu({ locale, dict, alternates }:
-  { locale: Locale; dict: Dict; alternates: Partial<Record<Locale, string>> }) {
+type NavItem = { label: string; href: string };
+export default function MobileMenu({ locale, dict, alternates, navLabels }:
+  { locale: Locale; dict: Dict; alternates: Partial<Record<Locale, string>>; navLabels?: NavItem[] }) {
   const { overlay, close, openSearch } = useStorefront();
   const router = useRouter();
   const t = sf(locale);
@@ -28,7 +29,13 @@ export default function MobileMenu({ locale, dict, alternates }:
 
   const go = (href: string) => { close(); router.push(href); };
 
-  const links: { label: string; href: string }[] = [
+  // §C use the same centralized, admin-editable nav labels as the desktop header when provided,
+  // so the desktop header and mobile drawer never drift. Fall back to the static dictionary.
+  const links: { label: string; href: string }[] = navLabels && navLabels.length ? [
+    { label: dict.nav.home, href: `/${locale}` },
+    ...navLabels,
+    { label: dict.nav.contact, href: `/${locale}#angebot` },
+  ] : [
     { label: dict.nav.home, href: `/${locale}` },
     { label: dict.nav.products, href: sectionPath('products', locale) },
     { label: dict.nav.scents, href: sectionPath('scents', locale) },
@@ -38,6 +45,8 @@ export default function MobileMenu({ locale, dict, alternates }:
     { label: dict.nav.faq, href: `/${locale}#faq` },
     { label: dict.nav.contact, href: `/${locale}#angebot` },
   ];
+  // §P Account entry lives in the drawer as a real link (moved out of the tight mobile header).
+  const accountLabel = locale==='de' ? 'Mein Konto' : locale==='en' ? 'My Account' : 'Mon compte';
 
   return (
     <div className={`sfdrawer sfdrawer--left${open ? ' is-open' : ''}`} aria-hidden={!open}>
@@ -63,6 +72,11 @@ export default function MobileMenu({ locale, dict, alternates }:
           <IconSpark size={18} /> {dict.cta.configure}
         </button>
 
+        <button className="menu-nav__item menu-account-link" onClick={() => go(`/${locale}/konto`)}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: '.5rem', verticalAlign: 'middle' }}><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+          {accountLabel}
+        </button>
+
         <div className="menu-prefs">
           <div className="menu-pref">
             <span className="menu-pref__label">{t.language}</span>
@@ -74,7 +88,6 @@ export default function MobileMenu({ locale, dict, alternates }:
           </div>
         </div>
 
-        <p className="menu-account muted">{t.accountSoon}</p>
       </div>
     </div>
   );

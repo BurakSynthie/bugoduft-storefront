@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getCustomerUser } from '@/lib/customer/session';
 import ProductGallery from '@/components/product/ProductGallery';
 import { locales, isLocale, type Locale } from '@/i18n/config';
 import { getDict } from '@/i18n';
@@ -17,9 +18,11 @@ import { Container, SectionHeader, Button, Price, Badge } from '@/components/ui'
 import { IconArrow, IconCheck } from '@/components/ui/icons';
 import JsonLd from '@/seo/JsonLd';
 import Configurator from '@/components/configurator/Configurator';
+import TrackProductView from '@/components/product/TrackProductView';
 import SamplePage from '@/components/storefront/SamplePage';
 import { PrintFileCheckSection } from '@/components/storefront/PrintFileCheckCta';
 import { getSettings } from '@/repositories/settings';
+import { optionLabel } from '@/lib/i18n/product-options';
 import { getProductBySlug as getProductBySlugRead, getProducts as getProductsRead, getCollections as getCollectionsRead, getScents as getScentsRead, getProductAlternates } from '@/repositories/catalog.read';
 
 const DETAILS: Record<string,string> = { de:'Details ansehen', en:'View details', fr:'Voir les détails' };
@@ -52,57 +55,82 @@ export function generateStaticParams() {
   return out;
 }
 
-export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
-  if (!isLocale(params.locale)) return {};
-  const locale = params.locale as Locale;
-  const r = resolve(locale, params.slug);
+export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
+  const { locale: lp, slug } = await params;        // §HIGH-16 Next.js 15 async params
+  if (!isLocale(lp)) return {};
+  const locale = lp as Locale;
+  const r = resolve(locale, slug);
   if (!r) return {};
+  // §H/§I centralized brand + per-page SEO overrides. buildMetadata strips any legacy brand
+  // suffix in stored/seed titles and the central template (layout.tsx) adds the brand once.
+  const settings = await getSettings();
+  const brand = settings.brandName || undefined;
+  const pages = settings.seo.pages;
   if (r.kind === 'product') {
     const p = await getProductBySlugRead(locale, r.slug); if (!p) return {};
     const alternates = await getProductAlternates(p.groupId);
     return buildMetadata({ locale, path: itemPath('products', locale, p.slug),
       title: p.seo.title, description: p.seo.description, alternates, ogType:'article',
-      ogImage: p.coverImage ?? undefined });
+      ogImage: p.coverImage || settings.defaultOgImage || undefined, brand });
   }
   if (r.kind === 'industry') {
     const i = getIndustryBySlug(locale, r.slug); if (!i) return {};
+    // §K/§3 SEO SINGLE SOURCE: prefer seo.pages.autohaus/werkstatt for SEO title/meta/OG.
+    // Match by STABLE key (not localized slug) so EN/FR resolve overrides too.
+    const seoKey = i.key === 'autohaeuser' ? 'autohaus' : i.key === 'werkstaetten' ? 'werkstatt' : null;
+    const sp = seoKey ? pages[seoKey] : null;
     return buildMetadata({ locale, path: itemPath('industries', locale, i.slug),
-      title: i.seo.title, description: i.seo.description, alternates: industryAlternates(i.groupId) });
+      title: (sp?.title[locale]) || i.seo.title,
+      description: (sp?.description[locale]) || i.seo.description,
+      alternates: industryAlternates(i.groupId), brand,
+      ogImage: sp?.ogImage || settings.defaultOgImage || undefined });
   }
   if (r.kind === 'section-index' && r.section === 'configurator') {
-    return { title: 'Konfigurator | BUGO DUFT', robots: { index:false, follow:true } };
+    return { title: 'Konfigurator', robots: { index:false, follow:true } };
   }
   if (r.kind === 'section-index' && r.section === 'sample') {
-    const title = locale==='de' ? 'Duftmuster-Set — 40 Düfte | BUGO DUFT'
-      : locale==='en' ? 'Fragrance Sample Set — 40 Scents | BUGO DUFT'
-      : 'Coffret d’échantillons — 40 Parfums | BUGO DUFT';
-    const price = formatMoney((await getSettings()).commerce.paidSample.priceCents, 'EUR', locale);
-    return buildMetadata({ locale, path: sectionPath('sample', locale), title,
-      description: locale==='de' ? `Testen Sie alle 40 BUGO-Düfte für einmalig ${price}.`
+    const seedTitle = locale==='de' ? 'Duftmuster-Set — 40 Düfte'
+      : locale==='en' ? 'Fragrance Sample Set — 40 Scents'
+      : 'Coffret d’échantillons — 40 Parfums';
+    const price = formatMoney(settings.commerce.paidSample.priceCents, 'EUR', locale);
+    const sp = pages.sample;
+    return buildMetadata({ locale, path: sectionPath('sample', locale),
+      title: sp.title[locale] || seedTitle,
+      description: sp.description[locale] || (locale==='de' ? `Testen Sie alle 40 BUGO-Düfte für einmalig ${price}.`
         : locale==='en' ? `Try all 40 BUGO fragrances for a one-time ${price}.`
-        : `Testez les 40 parfums BUGO pour ${price} une seule fois.`,
-      alternates: sectionAlternates('sample') });
+        : `Testez les 40 parfums BUGO pour ${price} une seule fois.`),
+      alternates: sectionAlternates('sample'), brand,
+      ogImage: sp.ogImage || settings.defaultOgImage || undefined });
   }
-  // section index
+  // section index (products / scents / industries / production)
   const dict = getDict(locale);
-  const titles: Record<Section, string> = {
-  products: dict.nav.products,
-  scents: dict.nav.scents,
-  industries: dict.nav.industries,
-  configurator: "Konfigurator",
-  sample: locale==='de' ? 'Duftmuster' : locale==='en' ? 'Fragrance Sample' : 'Échantillons'
-};
+  const seedTitles: Record<Section, string> = {
+    products: dict.nav.products,
+    scents: dict.nav.scents,
+    industries: dict.nav.industries,
+    configurator: "Konfigurator",
+    sample: locale==='de' ? 'Duftmuster' : locale==='en' ? 'Fragrance Sample' : 'Échantillons',
+  };
+  // Map the resolved section to a SEO page key where admin overrides exist.
+  const pageKey = r.section === 'products' ? 'products'
+    : r.section === 'scents' ? 'scents'
+    : r.section === 'industries' ? 'industries' : null;
+  const ov = pageKey ? pages[pageKey] : null;
   return buildMetadata({ locale, path: sectionPath(r.section, locale),
-    title: `${titles[r.section]} | BUGO DUFT`,
-    description: dict.common.minOrder + '.', alternates: sectionAlternates(r.section) });
+    title: (ov?.title[locale]) || seedTitles[r.section],
+    description: (ov?.description[locale]) || (dict.common.minOrder + '.'),
+    alternates: sectionAlternates(r.section), brand,
+    ogImage: (ov?.ogImage) || settings.defaultOgImage || undefined });
 }
 
 // -------- page --------
-export default async function CatchAll({ params, searchParams }: { params: Params; searchParams?: { k?: string } }) {
-  if (!isLocale(params.locale)) notFound();
-  const locale = params.locale as Locale;
+export default async function CatchAll({ params, searchParams }: { params: Promise<Params>; searchParams?: Promise<{ k?: string }> }) {
+  const { locale: lp, slug } = await params;        // §HIGH-16 Next.js 15 async params + searchParams
+  const sp = (await searchParams) ?? {};
+  if (!isLocale(lp)) notFound();
+  const locale = lp as Locale;
   const dict = getDict(locale);
-  const r = resolve(locale, params.slug);
+  const r = resolve(locale, slug);
   if (!r) notFound();
 
   const crumbHome = { name:'Home', url: abs(`/${locale}`) };
@@ -115,21 +143,26 @@ export default async function CatchAll({ params, searchParams }: { params: Param
     const products = await getProductsRead(locale);
     const cols = await getCollectionsRead(locale);
     type ConfCol = { collectionCode:string; collectionName:string; productId:string;
-      basePriceCents:number; scentCodes:string[]; tiers:{minQty:number; ratePer1000Cents:number}[] };
+      basePriceCents:number; scentCodes:string[]; tiers:{minQty:number; ratePer1000Cents:number}[];
+      intenseCents:number; minQty:number; maxQty:number; qtyStep:number };
+    const intenseOf = (p: typeof products[number]) =>
+      p.options.find(o => o.key === 'intense_fragrance')?.priceDeltaCents ?? 3000;
     const collections: ConfCol[] = cols.flatMap(c => {
       const p = products.find(pp => pp.collectionCode === c.code);
       if (!p) return [];
+      // §HIGH-4/§HIGH-6 each collection carries ITS OWN intensive rate and quantity rules.
       return [{ collectionCode:c.code, collectionName:c.name, productId:p.id,
         basePriceCents:p.basePriceCents, scentCodes:p.scentCodes,
-        tiers:(p.tiers||[]).map(tt=>({minQty:tt.minQty, ratePer1000Cents:tt.unitPriceCents})) }];
+        tiers:(p.tiers||[]).map(tt=>({minQty:tt.minQty, ratePer1000Cents:tt.unitPriceCents})),
+        intenseCents:intenseOf(p), minQty:p.minQty, maxQty:p.maxQty, qtyStep:p.qtyStep }];
     });
     const settings = await getSettings();
     const sset = settings.sample;
     const scents = await getScentsRead(locale);
-    const intense = products[0]?.options.find(o => o.key === 'intense_fragrance');
-    const k = searchParams?.k && collections.find(c => c.collectionCode === searchParams.k) ? searchParams.k : undefined;
+    // Prop is only a fallback default now — each collection carries its own intenseCents (§HIGH-4).
+    const k = sp.k && collections.find(c => c.collectionCode === sp.k) ? sp.k : undefined;
     return <Configurator locale={locale} collections={collections} scents={scents}
-      intenseCents={intense ? intense.priceDeltaCents : 3000} initialCollection={k}
+      intenseCents={collections[0]?.intenseCents ?? 3000} initialCollection={k}
       sampleThreshold={sset.enabled ? sset.threshold : 0} sampleValueEur={sset.valueEur}
       contactEmail={settings.contact.email || null} contactWhatsapp={settings.contact.whatsapp || null} />;
   }
@@ -138,7 +171,13 @@ export default async function CatchAll({ params, searchParams }: { params: Param
     const settings = await getSettings();
     const ps = settings.commerce.paidSample;
     if (!ps.enabled) notFound();   // §P1: admin can disable the paid Duftmuster-Set entirely
+    // §OPTION-3-v3 #6C scope the reload-persistent attempt key to the current identity so a
+    // different signed-in user on the same browser cannot inherit another user's sample attempt.
+    const sampleUser = await getCustomerUser();
+    const spSeo = settings.seo.pages.sample;
     return <SamplePage locale={locale} priceCents={ps.priceCents} creditCents={ps.creditCents}
+      identity={sampleUser?.id ?? 'guest'}
+      h1={spSeo.h1[locale] || null} intro={spSeo.intro[locale] || null}
       contactEmail={settings.contact.email || null} contactWhatsapp={settings.contact.whatsapp || null} />;
   }
 
@@ -148,12 +187,16 @@ export default async function CatchAll({ params, searchParams }: { params: Param
     const crumbs = [ crumbHome,
       { name: dict.nav.products, url: abs(sectionPath('products', locale)) },
       { name: p.name, url: abs(itemPath('products', locale, p.slug)) } ];
+    const brandSettings = await getSettings();
     return (
       <>
+        {/* §Analytics 3A — consent-aware product view (fires once via window.bugoTrack). */}
+        <TrackProductView slug={p.slug} params={{ item_name: p.name, item_id: p.collectionCode,
+          price: p.priceFromCents/100, currency: p.currency }} />
         <JsonLd data={[
           breadcrumbLd(crumbs),
           productLd({ name:p.name, description:p.seo.description, url:abs(itemPath('products',locale,p.slug)),
-            priceFromCents:p.priceFromCents, currency:p.currency }),
+            priceFromCents:p.priceFromCents, currency:p.currency, brand: brandSettings.brandName || undefined }),
         ]} />
         <section className="section">
           <Container>
@@ -191,7 +234,7 @@ export default async function CatchAll({ params, searchParams }: { params: Param
                 <ul style={{ listStyle:'none', padding:0, marginTop:'var(--s-6)', display:'grid', gap:'.5rem' }}>
                   {p.options.map(o => (
                     <li key={o.key} style={{ display:'flex', gap:'.5rem', alignItems:'center', color:'var(--fg-muted)', fontSize:'.92rem' }}>
-                      <IconCheck size={16} /> {o.labelDe}
+                      <IconCheck size={16} /> {optionLabel(o.key, o.labelDe, locale)}
                       {o.priceDeltaCents>0 && <Badge>+{formatMoney(o.priceDeltaCents, p.currency, locale)}</Badge>}
                     </li>
                   ))}
@@ -200,7 +243,7 @@ export default async function CatchAll({ params, searchParams }: { params: Param
               {/* sticky product visual (~45% col): interactive gallery — thumbs switch main */}
               <div style={{ position:'sticky', top:'88px', alignSelf:'start' }}>
                 <ProductGallery cover={p.coverImage ?? null} coverAlt={p.coverAlt ?? null}
-                  gallery={p.gallery} collectionCode={p.collectionCode} name={p.name} />
+                  gallery={p.gallery} galleryAlt={p.galleryAlt} collectionCode={p.collectionCode} name={p.name} />
                 <div className="chips" style={{ marginTop:'var(--s-4)' }}>
                   {scents.slice(0,6).map(s => <span key={s.code} className="chip" aria-pressed={false}>{s.name}</span>)}
                 </div>
@@ -263,14 +306,23 @@ export default async function CatchAll({ params, searchParams }: { params: Param
     const i = getIndustryBySlug(locale, r!.slug); if (!i) notFound();
     const crumbs = [ crumbHome, { name: dict.nav.industries, url: abs(sectionPath('industries', locale)) },
       { name: i.name, url: abs(itemPath('industries', locale, i.slug)) } ];
+    // §K/§2 admin content overrides for the two launch-important industry pages (Autohaus,
+    // Werkstatt). industryContent drives the VISIBLE H1/body only (SEO comes from seo.pages).
+    // Match by STABLE key so EN (car-dealerships/workshops) and FR (concessionnaires/garages)
+    // resolve the same override as DE (autohaeuser/werkstaetten).
+    const settings = await getSettings();
+    const ic = i.key === 'autohaeuser' ? settings.industryContent.autohaus
+      : i.key === 'werkstaetten' ? settings.industryContent.werkstatt : null;
+    const h1 = (ic?.h1[locale]) || i.headline;
+    const body = (ic?.body[locale]) || i.body;
     return (
       <>
         <JsonLd data={breadcrumbLd(crumbs)} />
         <section className="section">
           <Container><div style={{ maxWidth: 760 }}>
             <span className="eyebrow">{dict.nav.industries}</span>
-            <h1 style={{ fontSize:'var(--t-h2)', marginTop:'var(--s-3)' }}>{i.headline}</h1>
-            <p className="lede">{i.body}</p>
+            <h1 style={{ fontSize:'var(--t-h2)', marginTop:'var(--s-3)' }}>{h1}</h1>
+            <p className="lede">{body}</p>
             <div style={{ marginTop:'var(--s-6)' }}>
               <Button href={`/${locale}#angebot`} variant="primary" size="lg">{dict.cta.quote}</Button>
             </div>
@@ -285,12 +337,13 @@ export default async function CatchAll({ params, searchParams }: { params: Param
     const products = await getProductsRead(locale);
     const cols = await getCollectionsRead(locale);
     const settings = await getSettings();
+    const pv = settings.seo.pages.products;
     return (
       <>
       <section className="section">
         <Container>
-          <SectionHeader eyebrow={dict.nav.products} title={dict.cta.all}
-            lede={dict.common.minOrder + '.'} />
+          <SectionHeader eyebrow={dict.nav.products} title={pv.h1[locale] || dict.cta.all}
+            lede={pv.intro[locale] || (dict.common.minOrder + '.')} />
           <div className="grid grid-4">
             {cols.map(c => {
               const p = products.find(pp => pp.collectionCode === c.code);
@@ -323,13 +376,15 @@ export default async function CatchAll({ params, searchParams }: { params: Param
   }
   if (r.section === 'scents') {
     const scents = await getScentsRead(locale);
+    const sv = (await getSettings()).seo.pages.scents;
     const catLabel = (c:string) => ({de:{frisch:'Frisch',fruchtig:'Fruchtig',suess:'Süß',elegant:'Elegant',intensiv:'Intensiv'},
       en:{frisch:'Fresh',fruchtig:'Fruity',suess:'Sweet',elegant:'Elegant',intensiv:'Intense'},
       fr:{frisch:'Frais',fruchtig:'Fruité',suess:'Sucré',elegant:'Élégant',intensiv:'Intense'}} as any)[locale][c];
     return (
       <section className="section">
         <Container>
-          <SectionHeader eyebrow={dict.nav.scents} title={dict.nav.scents} />
+          <SectionHeader eyebrow={dict.nav.scents} title={sv.h1[locale] || dict.nav.scents}
+            lede={sv.intro[locale] || undefined} />
           {scentCategories.map(cat => {
             const group = scents.filter(s => s.category === cat);
             if (!group.length) return null;
@@ -348,10 +403,12 @@ export default async function CatchAll({ params, searchParams }: { params: Param
   }
   // industries index
   const items = listIndustries(locale);
+  const iv = (await getSettings()).seo.pages.industries;
   return (
     <section className="section">
       <Container>
-        <SectionHeader eyebrow={dict.nav.industries} title={dict.nav.industries} />
+        <SectionHeader eyebrow={dict.nav.industries} title={iv.h1[locale] || dict.nav.industries}
+          lede={iv.intro[locale] || undefined} />
         <div className="grid grid-2">
           {items.map(i => (
             <Link key={i.slug} href={itemPath('industries', locale, i.slug)} className="card" style={{ padding:'var(--s-6)' }}>

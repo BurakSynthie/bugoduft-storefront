@@ -7,9 +7,10 @@ import AccountShell from '@/components/account/AccountShell';
 import { configuratorPath } from '@/lib/routing';
 export const dynamic = 'force-dynamic';
 
-export default async function Dashboard({ params }: { params:{ locale:string } }) {
-  if (!isLocale(params.locale)) notFound();
-  const locale = params.locale as Locale;
+export default async function Dashboard({ params }: { params: Promise<{ locale:string }> }) {
+  const { locale: lp } = await params;              // §HIGH-16 Next.js 15 async params
+  if (!isLocale(lp)) notFound();
+  const locale = lp as Locale;
   const user = await getCustomerUser();
   if (!user) redirect(`/${locale}/konto/anmelden`);
   await ensureCustomerRow(user);

@@ -559,7 +559,7 @@ body.overlay-open{overflow:hidden}
 
 /* Phase 6D: mobile quick language switcher */
 .only-mobile{display:none}
-@media(max-width:880px){ .only-mobile{display:inline-flex} }
+@media(max-width:1023px){ .only-mobile{display:inline-flex} }
 .qlang{position:relative}
 .qlang__btn{display:inline-flex;align-items:center;gap:.2rem;font-weight:700;font-size:.8rem;padding:.4rem .55rem;
   border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--fg);cursor:pointer;font-family:inherit}
@@ -679,3 +679,66 @@ body.overlay-open{overflow:hidden}
 /* Footer cookie-settings button styled like a footer link */
 .footer__linkbtn{background:none;border:0;padding:0;margin:0;color:inherit;font:inherit;cursor:pointer;text-align:left}
 .footer__linkbtn:hover{color:#fff;text-decoration:underline}
+
+/* =====================================================================
+   §P LAUNCH MOBILE OVERFLOW — root-cause fix (not just a clip).
+   The document itself must never scroll horizontally; only explicit
+   carousels (.hscroll/.prodwrap/.pdp__gallery) may scroll on the x-axis.
+   Verified against 320/360/375/390/393/414/430 widths by source audit.
+   ===================================================================== */
+
+/* 1) DEFENSIVE ROOT GUARD (applied AFTER the element fixes below). Clip any
+      residual horizontal spill at the document root so a single stray wide
+      child can never make the whole page pannable. max-width:100% keeps the
+      viewport authoritative; overflow-x:clip preserves sticky/position. */
+html{max-width:100%;overflow-x:clip}
+body{max-width:100%;overflow-x:clip}
+
+/* 2) COMPACT MOBILE HEADER. The 2rem inter-group gap plus full gutter + a row
+      of 40px icon buttons overflowed <=430px. Tighten gap, gutter, icon size
+      and logo on small screens so Logo | language | search | cart | menu fits.
+      The account entry is already moved into the burger drawer (Header.tsx). */
+@media(max-width:1023px){
+  .header__inner{gap:var(--s-3)}
+  .header__actions{gap:var(--s-2)}
+}
+@media(max-width:430px){
+  .header .container{padding-inline:12px}
+  .header__inner{gap:.5rem;height:60px}
+  .header__actions{gap:6px}
+  .iconbtn{width:38px;height:38px}
+  /* Keep the wordmark from eating the row; it truncates gracefully if needed. */
+  .logo{font-size:1.05rem;min-width:0;overflow:hidden}
+  .logo__text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+}
+@media(max-width:360px){
+  .header__inner{gap:.4rem}
+  .header__actions{gap:4px}
+  .iconbtn{width:36px;height:36px}
+  .logo{font-size:.98rem}
+  .logo__mark{width:22px;height:22px}
+}
+
+/* 3) The logo text wrapper must be allowed to shrink inside the flex row. */
+.logo__text{display:inline-block}
+
+/* 4) The announcement bar is edge-to-edge and wraps; ensure it can never force
+      width beyond the viewport (long unbroken hrefs/labels break instead). */
+.ann{max-width:100%;overflow-wrap:anywhere}
+.ann__link{overflow-wrap:anywhere}
+
+/* 5) Mobile drawer account link spacing (moved from the compact header). */
+.menu-account-link{display:flex;align-items:center;margin-top:.5rem}
+
+/* 6) Guard commonly-wide blocks so they respect the viewport on small screens.
+      Intentional horizontal scrollers keep their own overflow-x:auto above. */
+.stats,.supportgrid,.grid,.footer__cols{max-width:100%}
+.hero__points,.hero__cred{max-width:100%}
+
+/* §1 Brand logo image (admin-uploaded). Height-constrained so it cannot recreate the
+   mobile horizontal overflow that §P fixed; width auto-scales and is capped on small
+   screens. Falls back to the CSS mark+text when no logo is set. */
+.logo__img{display:block;height:28px;width:auto;max-width:180px;object-fit:contain}
+.logo__img--footer{height:30px;max-width:200px}
+@media(max-width:430px){ .logo__img{height:24px;max-width:130px} }
+@media(max-width:360px){ .logo__img{height:22px;max-width:110px} }

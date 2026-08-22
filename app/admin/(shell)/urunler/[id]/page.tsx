@@ -27,8 +27,9 @@ function fromSeed(p: ProductSeed): EditableProduct {
     cover:null, video:null, poster:null, gallery:[], tr };
 }
 
-export default async function AdminProductEditor({ params }: { params: { id: string } }) {
-  const seed = getProductById(params.id);
+export default async function AdminProductEditor({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;                      // §HIGH-16 Next.js 15 async params
+  const seed = getProductById(id);
   if (!seed) notFound();
   const configured = isSupabaseConfigured();
   const initial = (configured ? await loadProduct(seed.productCode) : null) ?? fromSeed(seed);

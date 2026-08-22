@@ -1,5 +1,9 @@
 import type { ProductSeed } from '../types';
-// Reference/seed prices — admin-editable. Tiers illustrate volume pricing (server authoritative).
+// Reference/seed prices — admin-editable. Each product seeds ONLY its authoritative 1.000-unit
+// starting rate (e.g. STANDARD 26900¢/1.000 = €269,00). Volume/bulk tiers are NOT fabricated here:
+// they are runtime, admin-managed values entered in the product editor and stored in
+// product_price_tiers. A fresh DB therefore yields correct starting prices and a valid 1.000-unit
+// checkout; richer ladders are added by the admin. Server pricing is always authoritative.
 const options = [
   { key:'intense_fragrance', labelDe:'Intensivduft', priceDeltaCents:3000 },
 ];

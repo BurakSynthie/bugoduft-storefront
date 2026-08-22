@@ -23,6 +23,13 @@ type LF = {
   support:{ gTitle:string; gWa:string; gDisp:string; sTitle:string; sWa:string; sDisp:string };
   social:{ email:string; instagram:string };
   sections: HomeSections;
+  // §G launch-important, previously seed-only content now editable per locale.
+  stats:{ value:string; label:string }[];
+  whyBugo:{ title:string; body:string }[];
+  industries:string[];
+  brandImpact:{ title:string; body:string; points:string[] };
+  faqGroups:{ group:string; items:{ q:string; a:string }[] }[];
+  scentsHeading:{ eyebrow:string; title:string; description:string };
 };
 
 export default function HomeEditor({ initial, configured }:{ initial: Record<Locale, HomeExtra>; configured: boolean }) {
@@ -44,6 +51,16 @@ export default function HomeEditor({ initial, configured }:{ initial: Record<Loc
     },
     social: { email: initial[l].social.email ?? '', instagram: initial[l].social.instagram ?? '' },
     sections: { ...HOME_SECTIONS[l], ...(initial[l].sections ?? {}) },
+    stats: initial[l].stats.map(s => ({ value:s.value, label:s.label })),
+    whyBugo: initial[l].whyBugo.map(u => ({ title:u.title, body:u.body })),
+    industries: initial[l].industries.map(i => i.name),
+    brandImpact: { title:initial[l].brandImpact.title, body:initial[l].brandImpact.body, points:[...initial[l].brandImpact.points] },
+    faqGroups: initial[l].faqGroups.map(g => ({ group:g.group, items:g.items.map(it => ({ q:it.q, a:it.a })) })),
+    scentsHeading: {
+      eyebrow: initial[l].scentsHeading?.eyebrow ?? '',
+      title: initial[l].scentsHeading?.title ?? '',
+      description: initial[l].scentsHeading?.description ?? '',
+    },
   });
   const [byL, setByL] = useState<Record<Locale, LF>>(() =>
     Object.fromEntries(locales.map(l => [l, mkLF(l)])) as Record<Locale, LF>);
@@ -87,6 +104,15 @@ export default function HomeEditor({ initial, configured }:{ initial: Record<Loc
         },
         social: { ...base.social, email: b.social.email || undefined, instagram: b.social.instagram || undefined },
         sections: b.sections,
+        // §G persist launch-important content edits (mapped back to HomeExtra shapes).
+        stats: b.stats.map(s => ({ value:s.value, label:s.label })),
+        whyBugo: b.whyBugo.map(u => ({ title:u.title, body:u.body })),
+        industries: b.industries.map(name => ({ name })),
+        brandImpact: { title:b.brandImpact.title, body:b.brandImpact.body, points:b.brandImpact.points.filter(p=>p.trim()) },
+        faqGroups: b.faqGroups.map(g => ({ group:g.group, items:g.items.filter(it=>it.q.trim()||it.a.trim()) })),
+        scentsHeading: (b.scentsHeading.eyebrow.trim() || b.scentsHeading.title.trim() || b.scentsHeading.description.trim())
+          ? { eyebrow:b.scentsHeading.eyebrow, title:b.scentsHeading.title, description:b.scentsHeading.description }
+          : undefined,
       };
       return [l, he];
     })) as Record<Locale, HomeExtra>;
@@ -212,6 +238,72 @@ export default function HomeEditor({ initial, configured }:{ initial: Record<Loc
           <div className="field"><label>Instagram URL</label><input className="input" value={f.social.instagram} onChange={e=>setF({social:{...f.social,instagram:e.target.value}})} /></div>
         </div>
         <p className="muted" style={{ fontSize:'.82rem' }}>Boş sosyal URL storefront’ta bağlantı olarak render edilmez.</p>
+      </div>
+
+      {/* §G Trust metrics / stats */}
+      <div className="adm-panel">
+        <strong>İstatistik / güven metrikleri ({tab.toUpperCase()})</strong>
+        <p className="muted" style={{ fontSize:'.82rem', margin:'.25rem 0 var(--s-3)' }}>Ana sayfadaki sayısal güven şeridi. Değer + etiket.</p>
+        {f.stats.map((st,i)=>(
+          <div className="adm-grid2" key={i} style={{ marginBottom:'.4rem' }}>
+            <div className="field"><label>Değer #{i+1}</label><input className="input" value={st.value} onChange={e=>setF({stats:f.stats.map((x,j)=>j===i?{...x,value:e.target.value}:x)})} /></div>
+            <div className="field"><label>Etiket #{i+1}</label><input className="input" value={st.label} onChange={e=>setF({stats:f.stats.map((x,j)=>j===i?{...x,label:e.target.value}:x)})} /></div>
+          </div>
+        ))}
+      </div>
+
+      {/* §G Why BUGO cards */}
+      <div className="adm-panel">
+        <strong>Warum BUGO kartları ({tab.toUpperCase()})</strong>
+        {f.whyBugo.map((u,i)=>(
+          <div className="adm-grid2" key={i} style={{ marginBottom:'.4rem' }}>
+            <div className="field"><label>Başlık #{i+1}</label><input className="input" value={u.title} onChange={e=>setF({whyBugo:f.whyBugo.map((x,j)=>j===i?{...x,title:e.target.value}:x)})} /></div>
+            <div className="field"><label>Metin #{i+1}</label><input className="input" value={u.body} onChange={e=>setF({whyBugo:f.whyBugo.map((x,j)=>j===i?{...x,body:e.target.value}:x)})} /></div>
+          </div>
+        ))}
+      </div>
+
+      {/* §G Industries names */}
+      <div className="adm-panel">
+        <strong>Branşlar / sektör kartları ({tab.toUpperCase()})</strong>
+        <p className="muted" style={{ fontSize:'.82rem', margin:'.25rem 0 var(--s-3)' }}>Her satır bir sektör adı.</p>
+        <textarea className="textarea" rows={6} value={f.industries.join('\n')} onChange={e=>setF({industries:e.target.value.split('\n').map(x=>x.trim()).filter(Boolean)})} />
+      </div>
+
+      {/* §G Brand impact (Markenwirkung) */}
+      <div className="adm-panel">
+        <strong>Markenwirkung ({tab.toUpperCase()})</strong>
+        <div className="field"><label>Başlık</label><input className="input" value={f.brandImpact.title} onChange={e=>setF({brandImpact:{...f.brandImpact,title:e.target.value}})} /></div>
+        <div className="field"><label>Paragraf</label><textarea className="textarea" rows={2} value={f.brandImpact.body} onChange={e=>setF({brandImpact:{...f.brandImpact,body:e.target.value}})} /></div>
+        <div className="field"><label>Maddeler (her satır bir madde)</label><textarea className="textarea" rows={5} value={f.brandImpact.points.join('\n')} onChange={e=>setF({brandImpact:{...f.brandImpact,points:e.target.value.split('\n')}})} /></div>
+      </div>
+
+      {/* §7 Homepage Scents section heading (per locale) */}
+      <div className="adm-panel">
+        <strong>Düfte / Scents bölüm başlığı ({tab.toUpperCase()})</strong>
+        <p className="muted" style={{ fontSize:'.82rem', margin:'.25rem 0 var(--s-3)' }}>Boş bırakılırsa yerleşik varsayılan başlık kullanılır.</p>
+        <div className="adm-grid2">
+          <div className="field"><label>Eyebrow</label><input className="input" value={f.scentsHeading.eyebrow} onChange={e=>setF({scentsHeading:{...f.scentsHeading,eyebrow:e.target.value}})} /></div>
+          <div className="field"><label>Başlık</label><input className="input" value={f.scentsHeading.title} onChange={e=>setF({scentsHeading:{...f.scentsHeading,title:e.target.value}})} /></div>
+        </div>
+        <div className="field"><label>Açıklama</label><textarea className="textarea" rows={2} value={f.scentsHeading.description} onChange={e=>setF({scentsHeading:{...f.scentsHeading,description:e.target.value}})} /></div>
+      </div>
+
+      {/* §G FAQ groups + questions + answers */}
+      <div className="adm-panel">
+        <strong>SSS grupları ({tab.toUpperCase()})</strong>
+        <p className="muted" style={{ fontSize:'.82rem', margin:'.25rem 0 var(--s-3)' }}>Grup başlığı + soru/cevap çiftleri. Boş çiftler kaydedilmez.</p>
+        {f.faqGroups.map((g,gi)=>(
+          <div key={gi} style={{ borderTop:'1px solid var(--line,#eee)', paddingTop:'var(--s-3)', marginTop:'var(--s-3)' }}>
+            <div className="field"><label>Grup #{gi+1}</label><input className="input" value={g.group} onChange={e=>setF({faqGroups:f.faqGroups.map((x,j)=>j===gi?{...x,group:e.target.value}:x)})} /></div>
+            {g.items.map((it,ii)=>(
+              <div className="adm-grid2" key={ii} style={{ marginBottom:'.35rem' }}>
+                <div className="field"><label>Soru</label><input className="input" value={it.q} onChange={e=>setF({faqGroups:f.faqGroups.map((x,j)=>j===gi?{...x,items:x.items.map((y,k)=>k===ii?{...y,q:e.target.value}:y)}:x)})} /></div>
+                <div className="field"><label>Cevap</label><input className="input" value={it.a} onChange={e=>setF({faqGroups:f.faqGroups.map((x,j)=>j===gi?{...x,items:x.items.map((y,k)=>k===ii?{...y,a:e.target.value}:y)}:x)})} /></div>
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
 
       {pick && <MediaPicker type={(pick.kind==='prodVideo'||pick.kind==='heroVideo')?'video':'image'} onSelect={onPicked} onClose={()=>setPick(null)} />}

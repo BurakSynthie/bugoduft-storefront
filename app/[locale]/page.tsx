@@ -4,6 +4,8 @@ import { getDict } from '@/i18n';
 import { getHome } from '@/data/seed/homepage';
 import { getHomeExtra } from '@/repositories/homepage';
 import { getSettings } from '@/repositories/settings';
+import { listPublishedPosts } from '@/repositories/blog';
+import { blogArticlePath } from '@/lib/blog/types';
 import OrderSteps from '@/components/home/OrderSteps';
 import DesignIncluded from '@/components/home/DesignIncluded';
 import { listCollections, listScents, listIndustries, homeAlternates } from '@/repositories/catalog';
@@ -29,8 +31,9 @@ const scentHead: Record<Locale,{eyebrow:string;title:string;lede:string}> = {
   fr:{ eyebrow:'Parfums', title:'Trouvez votre parfum de marque', lede:'Du frais à l’intense – choisissez le parfum qui correspond à votre marque.' },
 };
 
-export async function generateMetadata({ params }: { params:{ locale:string } }): Promise<Metadata> {
-  const locale = (isLocale(params.locale)?params.locale:'de') as Locale;
+export async function generateMetadata({ params }: { params: Promise<{ locale:string }> }): Promise<Metadata> {
+  const { locale: lp } = await params;              // §HIGH-16 Next.js 15 async params
+  const locale = (isLocale(lp)?lp:'de') as Locale;
   const seedTitle = locale==='de' ? 'Individuelle Werbeduftanhänger ab 1.000 Stück'
     : locale==='en' ? 'Custom Promotional Air Fresheners from 1,000 Units'
     : 'Désodorisants publicitaires personnalisés dès 1 000 pièces';
@@ -38,14 +41,20 @@ export async function generateMetadata({ params }: { params:{ locale:string } })
   // never configured. Canonical/hreflang stay auto-derived (buildMetadata), never
   // admin-editable. Product-page SEO (app/[locale]/[...slug]/page.tsx) is unaffected.
   const settings = await getSettings();
-  const title = settings.seo.home.title[locale] || seedTitle;
-  const description = settings.seo.home.description[locale] || heroDesc[locale];
+  const brand = settings.brandName || undefined;
+  // §H home SEO: page-level admin overrides (seo.pages.home) win, then legacy seo.home, then
+  // the shipped seed title/description. §I buildMetadata strips any legacy brand suffix so the
+  // central template adds the brand exactly once.
+  const page = settings.seo.pages.home;
+  const title = page.title[locale] || settings.seo.home.title[locale] || seedTitle;
+  const description = page.description[locale] || settings.seo.home.description[locale] || heroDesc[locale];
   return buildMetadata({ locale, path:`/${locale}`, title, description, alternates: homeAlternates(),
-    ogImage: settings.defaultOgImage || undefined });
+    ogImage: page.ogImage || settings.defaultOgImage || undefined, brand });
 }
 
-export default async function HomePage({ params }: { params:{ locale:string } }) {
-  const locale = (isLocale(params.locale)?params.locale:'de') as Locale;
+export default async function HomePage({ params }: { params: Promise<{ locale:string }> }) {
+  const { locale: lp } = await params;              // §HIGH-16 Next.js 15 async params
+  const locale = (isLocale(lp)?lp:'de') as Locale;
   const dict = getDict(locale);
   const content = getHome(locale);
   const cols = await getCollections(locale);
@@ -56,9 +65,18 @@ export default async function HomePage({ params }: { params:{ locale:string } })
   const settings = await getSettings();
   const sections = settings.sections;
   const faqItems = hc.faqGroups.flatMap(g => g.items);
+  // §13 Homepage Blog preview reads the real published Blog CMS (latest 3 for this locale).
+  const blogPreview = (await listPublishedPosts(locale, 3)).map(p => ({
+    href: blogArticlePath(locale, p.slug), title: p.title, excerpt: p.excerpt,
+    image: p.coverImage, category: p.category || undefined,
+  }));
   return (
     <>
-      <JsonLd data={[organizationLd(), faqLd(faqItems)]} />
+      <JsonLd data={[organizationLd({
+        brand: settings.brandName || undefined,
+        email: settings.contact.service.email || settings.contact.email || null,
+        logo: settings.brand.logo || null,
+      }), faqLd(faqItems)]} />
       <Hero locale={locale} dict={dict} content={content} hc={hc} />
       <OrderSteps locale={locale} sec={sec} />
       <X.TrustStats locale={locale} hc={hc} />
@@ -69,15 +87,21 @@ export default async function HomePage({ params }: { params:{ locale:string } })
       <X.Production4 locale={locale} hc={hc} />
       <X.IndustriesCarousel locale={locale} hc={hc} />
       {sections.gallery && <X.Gallery locale={locale} hc={hc} />}
-      <Scents locale={locale} scents={scents} heading={scentHead[locale]} />
+      <Scents locale={locale} scents={scents} heading={hc.scentsHeading
+        ? { eyebrow: hc.scentsHeading.eyebrow || scentHead[locale].eyebrow,
+            title: hc.scentsHeading.title || scentHead[locale].title,
+            lede: hc.scentsHeading.description || scentHead[locale].lede }
+        : scentHead[locale]} />
       <X.BrandImpact locale={locale} hc={hc} />
       <X.WhyBugo2 locale={locale} hc={hc} />
       <X.ReviewsPreview locale={locale} hc={hc} />
       <S.Pricing locale={locale} cols={cols} dict={dict} sec={sec} />
       <QuoteForm locale={locale} sec={sec} />
       {sections.faq && <X.FaqGrouped locale={locale} hc={hc} />}
-      <X.SupportCta locale={locale} hc={hc} whatsapp={settings.contact.whatsapp} />
-      <X.BlogPreview locale={locale} hc={hc} />
+      <X.SupportCta locale={locale} hc={hc}
+        grafik={{ email: settings.contact.graphic.email, whatsapp: settings.contact.graphic.whatsapp, phone: settings.contact.graphic.phone }}
+        service={{ email: settings.contact.service.email, whatsapp: settings.contact.service.whatsapp, phone: settings.contact.service.phone }} />
+      <X.BlogPreview locale={locale} hc={hc} posts={blogPreview} />
       {sections.references && <X.LogoRail locale={locale} hc={hc} />}
       <S.FinalCta locale={locale} dict={dict} content={content} sec={sec} />
     </>

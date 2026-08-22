@@ -1,9 +1,55 @@
 'use client';
 import { useRef, useState } from 'react';
 import type { MediaRecord } from '@/lib/media/types';
-import { uploadMediaAction, deleteMediaAction } from '@/lib/media/actions';
+import { uploadMediaAction, deleteMediaAction, updateMediaAltAction } from '@/lib/media/actions';
 
 function fmtSize(b: number | null) { return b == null ? '' : b < 1024*1024 ? `${Math.round(b/1024)} KB` : `${(b/1048576).toFixed(1)} MB`; }
+
+type AltState = { de: string; en: string; fr: string };
+type AltSave = 'idle' | 'saving' | 'saved' | 'error';
+
+function AltEditor({ item, onSaved }: { item: MediaRecord; onSaved: (r: MediaRecord) => void }) {
+  const [alt, setAlt] = useState<AltState>({ de: item.altDe ?? '', en: item.altEn ?? '', fr: item.altFr ?? '' });
+  const [state, setState] = useState<AltSave>('idle');
+  const [open, setOpen] = useState(false);
+
+  async function save() {
+    setState('saving');
+    const res = await updateMediaAltAction(item.id, { de: alt.de, en: alt.en, fr: alt.fr });
+    if (res.ok) {
+      setState('saved');
+      onSaved({ ...item, altDe: alt.de || null, altEn: alt.en || null, altFr: alt.fr || null });
+      setTimeout(() => setState('idle'), 2000);
+    } else { setState('error'); }
+  }
+
+  if (!open) {
+    const has = item.altDe || item.altEn || item.altFr;
+    return (
+      <button className="linkbtn media-card__altbtn" onClick={() => setOpen(true)}>
+        {has ? 'ALT metni düzenle' : 'ALT metni ekle'}
+      </button>
+    );
+  }
+  return (
+    <div className="media-card__alt">
+      <div className="field"><label>ALT (DE)</label>
+        <input className="input" value={alt.de} onChange={e => setAlt(a => ({ ...a, de: e.target.value }))} /></div>
+      <div className="field"><label>ALT (EN)</label>
+        <input className="input" value={alt.en} onChange={e => setAlt(a => ({ ...a, en: e.target.value }))} /></div>
+      <div className="field"><label>ALT (FR)</label>
+        <input className="input" value={alt.fr} onChange={e => setAlt(a => ({ ...a, fr: e.target.value }))} /></div>
+      <div style={{ display:'flex', gap:'.4rem', alignItems:'center' }}>
+        <button className="adm-btn adm-btn--primary" disabled={state==='saving'} onClick={save}>
+          {state==='saving' ? 'Kaydediliyor…' : 'Kaydet'}
+        </button>
+        <button className="linkbtn" onClick={() => setOpen(false)}>Kapat</button>
+        {state==='saved' && <span className="adm-tag">Kaydedildi ✓</span>}
+        {state==='error' && <span className="adm-tag adm-tag--off">Hata</span>}
+      </div>
+    </div>
+  );
+}
 
 export default function MediaLibrary({ initial, configured }: { initial: MediaRecord[]; configured: boolean }) {
   const [items, setItems] = useState<MediaRecord[]>(initial);
@@ -33,6 +79,8 @@ export default function MediaLibrary({ initial, configured }: { initial: MediaRe
     else setError(res.message);
   }
 
+  const applyAlt = (r: MediaRecord) => setItems(prev => prev.map(m => m.id === r.id ? r : m));
+
   return (
     <div>
       {!configured && <div className="adm-note" style={{ marginBottom:'var(--s-4)' }}><span>ⓘ</span>
@@ -46,7 +94,7 @@ export default function MediaLibrary({ initial, configured }: { initial: MediaRe
         <label htmlFor="media-file" className={`adm-btn adm-btn--primary${(!configured||busy)?' is-disabled':''}`} aria-disabled={!configured||busy}>
           {busy ? 'Yükleniyor…' : '+ Medya yükle'}
         </label>
-        <span className="muted" style={{ fontSize:'.82rem' }}>JPG, PNG, WebP, MP4, WebM · maks. 50 MB</span>
+        <span className="muted" style={{ fontSize:'.82rem' }}>JPG, PNG, WebP, MP4, WebM · maks. 50 MB · ALT metni SEO için DE/EN/FR girilebilir</span>
       </div>
 
       {items.length === 0 ? (
@@ -65,6 +113,7 @@ export default function MediaLibrary({ initial, configured }: { initial: MediaRe
                 <span className="media-card__name" title={m.originalFilename ?? ''}>{m.originalFilename ?? m.id}</span>
                 <span className="muted" style={{ fontSize:'.74rem' }}>{m.mimeType.split('/')[1]?.toUpperCase()} · {fmtSize(m.sizeBytes)}</span>
               </figcaption>
+              {m.mediaType === 'image' && <AltEditor item={m} onSaved={applyAlt} />}
               {blocked?.id === m.id ? (
                 <div className="media-card__blocked">
                   Kullanımda: {blocked.by.join(', ')}

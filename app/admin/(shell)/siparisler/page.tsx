@@ -4,17 +4,18 @@ import { formatMoney, formatQty } from '@/lib/money';
 import Link from 'next/link';
 export const metadata = { title: 'Siparişler · BUGO DUFT' };
 
-export default async function OrdersList({ searchParams }:{ searchParams:{ q?:string; status?:string; sort?:string } }) {
+export default async function OrdersList({ searchParams }:{ searchParams: Promise<{ q?:string; status?:string; sort?:string }> }) {
   await requireAdmin();
-  const sort = searchParams.sort==='old' ? 'old' : 'new';
-  const { configured, rows } = await listOrders({ q:searchParams.q, status:searchParams.status, sort });
+  const sp = await searchParams;                    // §HIGH-16 Next.js 15 async searchParams
+  const sort = sp.sort==='old' ? 'old' : 'new';
+  const { configured, rows } = await listOrders({ q:sp.q, status:sp.status, sort });
   return (
     <>
       <div className="adm__top"><div><h1>Siparişler</h1><div className="adm__crumb">Operasyon / Siparişler</div></div></div>
       {!configured && <div className="adm-note"><span>ⓘ</span><span>Supabase yapılandırılmadı.</span></div>}
       <form className="adm-toolbar" method="get">
-        <input className="input" name="q" placeholder="Ara: no, e-posta, firma" defaultValue={searchParams.q ?? ''} />
-        <select className="select" name="status" defaultValue={searchParams.status ?? ''}>
+        <input className="input" name="q" placeholder="Ara: no, e-posta, firma" defaultValue={sp.q ?? ''} />
+        <select className="select" name="status" defaultValue={sp.status ?? ''}>
           <option value="">Tüm durumlar</option>
           {Object.entries(OP_STATUS_TR).map(([k,v])=><option key={k} value={k}>{v}</option>)}
         </select>

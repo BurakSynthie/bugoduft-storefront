@@ -17,10 +17,11 @@ export type PersistResult =
 export async function persistItemFiles(item: CartItem): Promise<PersistResult> {
   try {
     const files = getFiles(item.configId);
-    const fields: { field: string; name: string }[] = [];
-    if (files.front) fields.push({ field: 'front', name: files.front.name });
-    if (!item.sameBackAsFront && files.back) fields.push({ field: 'back', name: files.back.name });
-    files.supporting.forEach((f, i) => { if (f) fields.push({ field: `supporting-${i}`, name: f.name }); });
+    // §1 carry full metadata (type/size) so the server can validate before minting URLs.
+    const fields: { field: string; name: string; type: string; size: number }[] = [];
+    if (files.front) fields.push({ field: 'front', name: files.front.name, type: files.front.type, size: files.front.size });
+    if (!item.sameBackAsFront && files.back) fields.push({ field: 'back', name: files.back.name, type: files.back.type, size: files.back.size });
+    files.supporting.forEach((f, i) => { if (f) fields.push({ field: `supporting-${i}`, name: f.name, type: f.type, size: f.size }); });
 
     const begun = await beginCheckout(incomingOf(item), fields);
     if (!begun.ok) return { ok: false };
@@ -49,6 +50,9 @@ function incomingOf(item: CartItem): IncomingConfig {
   return {
     configId: item.configId, locale: item.locale, collectionCode: item.collectionCode,
     scentCode: item.scentCode, scentCode2: item.scentCode2, intensity: item.intensity, shape: item.shape, quantity: item.quantity,
+    // §P0-3 carry the customer's design choice to the server. Old cart items that genuinely
+    // predate this field get the safe default; a real selection is never lost.
+    designMode: item.designMode ?? 'bugo_creates',
     frontInstructions: item.frontInstructions, sameBackAsFront: item.sameBackAsFront,
     backInstructions: item.sameBackAsFront ? '' : item.backInstructions,
   };
@@ -73,10 +77,10 @@ export async function checkoutCartItem(item: CartItem, fallbackErr: string): Pro
 
   // Otherwise attempt to upload any files still held in this session, then finalize.
   const files = getFiles(item.configId);
-  const fileFields: { field: string; name: string }[] = [];
-  if (files.front && !item.frontPath) fileFields.push({ field: 'front', name: files.front.name });
-  if (!item.sameBackAsFront && files.back && !item.backPath) fileFields.push({ field: 'back', name: files.back.name });
-  files.supporting.forEach((f, i) => { if (f) fileFields.push({ field: `supporting-${i}`, name: f.name }); });
+  const fileFields: { field: string; name: string; type: string; size: number }[] = [];
+  if (files.front && !item.frontPath) fileFields.push({ field: 'front', name: files.front.name, type: files.front.type, size: files.front.size });
+  if (!item.sameBackAsFront && files.back && !item.backPath) fileFields.push({ field: 'back', name: files.back.name, type: files.back.type, size: files.back.size });
+  files.supporting.forEach((f, i) => { if (f) fileFields.push({ field: `supporting-${i}`, name: f.name, type: f.type, size: f.size }); });
 
   const begun = await beginCheckout(incoming, fileFields);
   if (!begun.ok) return { ok: false, message: item.locale === 'de' ? begun.message : fallbackErr };

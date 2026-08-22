@@ -111,13 +111,13 @@ export function getInfoPage(slug: string, locale: Locale, legal: LegalInfo): Inf
     },
     versand: {
       de: { title:'Versand & Zahlung', blocks:[
-        { h:'Versand', p:'Die Produktion erfolgt nach Freigabe; die Lieferzeit hängt von Menge und Motiv ab und wird im Angebot genannt.' },
+        { h:'Versand', p:'Die Produktion erfolgt nach finaler Designfreigabe in ca. 10–12 Werktagen; insgesamt sind es ca. 15–17 Werktage bis zur Lieferung. Wir liefern europaweit – Versand inklusive, anfallende Zollkosten sind, wo zutreffend, enthalten.' },
         { h:'Zahlung', p:'Die Bezahlung erfolgt sicher über das bereitgestellte Angebot (Shopify Draft Order). Der angezeigte Betrag ist der finale Gesamtpreis.' } ] },
       en: { title:'Shipping & Payment', blocks:[
-        { h:'Shipping', p:'Production begins after approval; delivery time depends on quantity and artwork and is stated in the offer.' },
+        { h:'Shipping', p:'Production takes approx. 10–12 working days after final design approval; in total approx. 15–17 working days to your door. We deliver Europe-wide – shipping included, and any applicable customs costs are covered where applicable.' },
         { h:'Payment', p:'Payment is handled securely via the provided offer (Shopify draft order). The amount shown is the final total.' } ] },
       fr: { title:'Livraison & Paiement', blocks:[
-        { h:'Livraison', p:'La production commence après validation ; le délai dépend de la quantité et du visuel et figure dans l’offre.' },
+        { h:'Livraison', p:'La production prend env. 10–12 jours ouvrés après validation finale du design ; au total env. 15–17 jours ouvrés jusqu’à la livraison. Nous livrons partout en Europe – livraison incluse, et les frais de douane éventuels sont couverts le cas échéant.' },
         { h:'Paiement', p:'Le paiement est sécurisé via l’offre fournie (Shopify draft order). Le montant affiché est le total final.' } ] },
     },
     about: {

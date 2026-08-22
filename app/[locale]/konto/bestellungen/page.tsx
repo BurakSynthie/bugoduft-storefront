@@ -7,9 +7,10 @@ import AccountShell from '@/components/account/AccountShell';
 export const dynamic = 'force-dynamic';
 const money = (c:number,cur:string,l:Locale)=> new Intl.NumberFormat(l==='de'?'de-DE':l==='en'?'en-IE':'fr-FR',{style:'currency',currency:cur||'EUR'}).format(c/100);
 
-export default async function Orders({ params }: { params:{ locale:string } }) {
-  if (!isLocale(params.locale)) notFound();
-  const locale = params.locale as Locale;
+export default async function Orders({ params }: { params: Promise<{ locale:string }> }) {
+  const { locale: lp } = await params;              // §HIGH-16 Next.js 15 async params
+  if (!isLocale(lp)) notFound();
+  const locale = lp as Locale;
   const user = await getCustomerUser();
   if (!user) redirect(`/${locale}/konto/anmelden`);
   await ensureCustomerRow(user);

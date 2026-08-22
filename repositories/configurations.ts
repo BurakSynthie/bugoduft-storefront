@@ -1,4 +1,5 @@
 import 'server-only';
+import { randomUUID } from 'node:crypto';
 import type { Locale } from '@/i18n/config';
 import { listProducts } from '@/repositories/catalog';
 import { validateQuantity } from '@/lib/quantity';
@@ -6,10 +7,14 @@ import { INTENSE_SURCHARGE_CENTS } from '@/config/shopify';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { SHAPES } from '@/lib/configurator/shapes';
-import { priceQuantity, type PriceTier } from '@/lib/pricing/tiers';
-import { getSettings } from '@/repositories/settings';
+import { priceQuantitySafe, type PriceTier } from '@/lib/pricing/tiers';
+import { isDesignMode, normalizeDesignMode } from '@/lib/configurator/design-mode';
+import { getSettings, getSettingsAuthoritative } from '@/repositories/settings';
 import { getCustomerUser, ensureCustomerRow } from '@/lib/customer/session';
 import { deleteDraftOrder } from '@/lib/shopify/draft-order';
+import {
+  resolveDraftLookup, firstOrderEligible, sampleCreditCents, staleReservationDecision, resolveLeaseClaim,
+} from '@/lib/checkout/guards';
 
 // Client-supplied config (untrusted). Prices are IGNORED and recomputed server-side.
 export type IncomingConfig = {
@@ -43,7 +48,9 @@ async function computeBestBenefit(preBenefitTotalCents: number): Promise<{
   if (!isSupabaseConfigured()) return { ...none, authUserId: user.id };
   const svc = createSupabaseServiceClient();
   if (!svc) return { ...none, authUserId: user.id };
-  const settings = await getSettings();
+  // §HIGH-8: read settings AUTHORITATIVELY. If the DB read errors we must NOT fall back to the
+  // defaults (which enable the first-order benefit) — an unknown settings state fails closed.
+  const { loaded: settingsLoaded, settings } = await getSettingsAuthoritative();
 
   // §P0: make sure this authenticated customer has a `customers` row BEFORE first-order
   // eligibility is evaluated — a user can register and go straight to checkout without ever
@@ -55,41 +62,49 @@ async function computeBestBenefit(preBenefitTotalCents: number): Promise<{
   // email, attach that purchase so the €20 credit becomes findable. Gated on emailVerified
   // (never a Dashboard assumption): an unconfirmed email can't claim guest commerce. Only
   // ever touches rows whose email equals the caller's own verified session email.
-  if (user.emailVerified) {
+  if (user.emailVerified && user.email) {
+    // §SMALL EXACT identity match — never ILIKE, whose `%`/`_` wildcards are legal in an email
+    // local part and could attach ANOTHER purchaser's guest sample to this account. user.email is
+    // already normalized at the source (getCustomerUser), and sample_orders emails are stored
+    // normalized (webhook + sample insert), so `.eq` is a safe exact match.
     const { data: custLink } = await svc.from('customers').select('id').eq('auth_user_id', user.id).maybeSingle();
     await svc.from('sample_orders')
       .update({ auth_user_id: user.id, customer_id: custLink?.id ?? null })
-      .is('auth_user_id', null).eq('payment_state', 'paid').ilike('email', user.email);
+      .is('auth_user_id', null).eq('payment_state', 'paid').eq('email', user.email);
   }
 
   // Unredeemed paid sample credit for this user (now including any just-linked guest row).
   // Excludes credits already reserved by a DIFFERENT, still-valid checkout so a second tab
   // doesn't even PREVIEW a credit another in-flight order holds (the authoritative guard is
   // the atomic reserve at finalize; this just keeps the preview honest).
-  const { data: sampleRow } = await svc.from('sample_orders')
+  const sampleRes = await svc.from('sample_orders')
     .select('id, credit_cents, credit_reserved_config_id, credit_reservation_expires_at')
     .eq('auth_user_id', user.id).eq('payment_state', 'paid').is('credit_used_at', null)
     .order('created_at', { ascending: true }).limit(1).maybeSingle();
-  const reservedElsewhere = !!sampleRow?.credit_reserved_config_id
-    && !!sampleRow?.credit_reservation_expires_at
-    && new Date(sampleRow.credit_reservation_expires_at).getTime() > Date.now();
-  const creditCents = sampleRow && !reservedElsewhere ? Math.min(sampleRow.credit_cents, preBenefitTotalCents) : 0;
+  // §P0-4 FAIL CLOSED: a DB error here yields 0 credit (guard), never a preview/grant we can't prove.
+  const creditCents = sampleCreditCents({
+    row: sampleRes.data as any, error: sampleRes.error,
+    preBenefitTotalCents, nowMs: Date.now(),
+  });
+  const sampleRow = creditCents > 0 ? (sampleRes.data as any) : null;
 
-  // §P0-4 FIRST-ORDER ELIGIBILITY: based on REAL paid main-order history only. An
-  // abandoned/unpaid/cancelled order never permanently consumes the benefit. A 'consumed'
-  // claim (set on confirmed payment) also blocks re-grant during the window before the
-  // order row lands. Percentage + on/off are admin-managed (§P1).
+  // §P0-4/§HIGH-8 FIRST-ORDER ELIGIBILITY: based on REAL paid main-order history only, and only
+  // when the authoritative settings loaded. Every DB read is checked; ANY error/ambiguity fails
+  // closed to "not eligible" (see firstOrderEligible). An abandoned/unpaid/cancelled order never
+  // permanently consumes the benefit; a 'consumed' claim blocks re-grant. Admin-managed % + on/off.
   let fivePctCents = 0;
   const fo = settings.commerce.firstOrder;
-  const { data: cust } = await svc.from('customers').select('id').eq('auth_user_id', user.id).maybeSingle();
-  if (cust && fo.enabled && fo.percent > 0) {
-    const { count } = await svc.from('orders').select('id', { count: 'exact', head: true })
+  const custRes = await svc.from('customers').select('id').eq('auth_user_id', user.id).maybeSingle();
+  const cust = custRes.error ? null : custRes.data;   // §HIGH-8 customer lookup error → fail closed
+  if (cust) {
+    const count = await svc.from('orders').select('id', { count: 'exact', head: true })
       .eq('customer_id', cust.id).eq('order_kind', 'main').eq('payment_state', 'paid');
-    let eligible = !count;
-    if (eligible) {
-      const { data: claim } = await svc.from('first_order_claims').select('state').eq('customer_id', cust.id).maybeSingle();
-      if (claim?.state === 'consumed') eligible = false;
-    }
+    const claim = await svc.from('first_order_claims').select('state').eq('customer_id', cust.id).maybeSingle();
+    const eligible = firstOrderEligible({
+      settingsLoaded, firstOrderEnabled: fo.enabled, firstOrderPercent: fo.percent,
+      count: { count: count.count, error: count.error },
+      claim: { data: claim.data as any, error: claim.error },
+    });
     if (eligible) fivePctCents = Math.round(preBenefitTotalCents * (fo.percent / 100));
   }
 
@@ -179,9 +194,19 @@ export async function validateAndPrice(c: IncomingConfig): Promise<Priced> {
   }
   if (!SHAPE_IDS.has(c.shape as any)) return { ok:false, error:'invalid_shape' };
   if (c.intensity !== 'normal' && c.intensity !== 'intense') return { ok:false, error:'invalid_intensity' };
+  // §P0-3 never trust an arbitrary design-mode string from the browser. Undefined is allowed
+  // (legacy carts default safely at persistence); any other non-union value is rejected.
+  if (c.designMode !== undefined && !isDesignMode(c.designMode)) return { ok:false, error:'invalid_design_mode' };
 
-  const q = priceQuantity(src.tiers, c.quantity);
-  const surchargeCents = c.intensity === 'intense' ? src.intenseSurchargeCents : 0;
+  // §P0/HIGH-12 no future-tier fallback: if NO active tier covers this quantity, pricing FAILS
+  // CLOSED — never charge a smaller quantity at a larger tier's bulk rate.
+  const q = priceQuantitySafe(src.tiers, c.quantity);
+  if (!q) { console.error('[pricing] no active tier covers quantity', c.quantity, 'for', c.collectionCode); return { ok:false, error:'pricing_unavailable' }; }
+  // §P0-2/§P0-3: the intense-fragrance surcharge is a PER-1,000-UNITS rate, not per order.
+  // total surcharge = (quantity / 1000) × rate. Generic product options remain per-order.
+  const surchargeCents = c.intensity === 'intense'
+    ? Math.round(src.intenseSurchargeCents * (c.quantity / 1000))
+    : 0;
   const settings = await getSettings();
   const freeSampleSet = settings.sample.enabled && c.quantity >= settings.sample.threshold;
 
@@ -207,6 +232,17 @@ export type PersistInput = IncomingConfig & Priced & {
 };
 
 // Idempotent upsert keyed by configId (retries reuse the same row).
+//
+// §P0-1 / CHECKOUT-UPDATE-SEMANTICS — omitted ≠ cleared. This function distinguishes three
+// states for optional persisted fields (artwork paths, Shopify draft id, second scent, design
+// mode, status):
+//   • property absent / undefined  → PRESERVE the existing value (on create: a safe initializer)
+//   • property === null            → EXPLICITLY clear (only where clearing is meaningful)
+//   • property has a value         → replace
+// This is what stops beginCheckout() (which never sends paths or the shopify id) from wiping an
+// existing configuration's active Draft Order id or uploaded-artwork references before
+// finalizeCheckout() has intentionally invalidated them. The always-authoritative columns
+// (price, quantity, scent, etc.) are recomputed server truth and always written.
 export async function upsertConfiguration(input: PersistInput): Promise<{ ok:true } | { ok:false; message:string }> {
   if (!isSupabaseConfigured()) return { ok:false, message:'Supabase ist nicht konfiguriert.' };
   const c = createSupabaseServiceClient();
@@ -216,19 +252,23 @@ export async function upsertConfiguration(input: PersistInput): Promise<{ ok:tru
   const { data: prod, error: lookupErr } = await c.from('products').select('id').eq('product_code', input.productCode).maybeSingle();
   if (lookupErr) return { ok:false, message: lookupErr.message };
   if (!prod) console.warn('[configurations] no products row for product_code', input.productCode, '- storing null product_id');
-  const row = {
-    id: input.configId, locale: input.locale, product_id: prod?.id ?? null, collection_code: input.collectionCode,
-    quantity: input.quantity, scent_code: input.scentCode, scent_code_2: input.scentCode2 ?? null, intensity: input.intensity, shape: input.shape,
-    front_path: input.frontPath ?? null, front_instructions: input.frontInstructions,
-    same_back_as_front: input.sameBackAsFront, back_path: input.backPath ?? null,
+
+  // Is this a create or an update? A DB error here fails closed (never blind-insert/overwrite).
+  const { data: existing, error: existErr } = await c.from('configurations').select('id').eq('id', input.configId).maybeSingle();
+  if (existErr) return { ok:false, message: existErr.message };
+  const isCreate = !existing;
+
+  // Always-authoritative columns — recomputed server truth, written on every call.
+  const patch: Record<string, any> = {
+    locale: input.locale, product_id: prod?.id ?? null, collection_code: input.collectionCode,
+    quantity: input.quantity, scent_code: input.scentCode, intensity: input.intensity, shape: input.shape,
+    front_instructions: input.frontInstructions,
+    same_back_as_front: input.sameBackAsFront,
     back_instructions: input.sameBackAsFront ? null : input.backInstructions,
-    supporting: input.supporting ?? [],
     base_price_cents: input.basePriceCents, surcharge_cents: input.surchargeCents, total_price_cents: input.totalPriceCents,
     unit_rate_cents: (input as any).unitRateCents ?? null,
     free_sample_set: (input as any).freeSampleSet ?? false,
     free_sample_source: (input as any).freeSampleSource ?? null,
-    design_mode: input.designMode ?? 'bugo_creates',
-    status: input.status ?? 'draft', shopify_cart_id: input.shopifyCartId ?? null,
     savings_cents: (input as any).savingsCents ?? 0,
     pre_benefit_total_cents: (input as any).preBenefitTotalCents ?? null,
     benefit_type: (input as any).benefitType ?? null,
@@ -236,8 +276,40 @@ export async function upsertConfiguration(input: PersistInput): Promise<{ ok:tru
     sample_order_id: (input as any).sampleOrderId ?? null,
     auth_user_id: (input as any).authUserId ?? null,
   };
-  const { error } = await c.from('configurations').upsert(row, { onConflict: 'id' });
-  if (error) return { ok:false, message: error.message };
+
+  // §P0-1 preserve-on-omit optional fields. undefined = omitted (do NOT write the column at all);
+  // null = explicit clear; value = replace. On INSERT an omitted column simply takes the table's
+  // OWN default (supporting → '[]', design_mode → 'bugo_creates', status → 'draft', the rest →
+  // NULL) — so we never bake create-defaults into app code, and the same `patch` is safe to use
+  // for the update-fallback below without ever nulling a value another writer just set.
+  const setOpt = (col: string, v: unknown) => { if (v !== undefined) patch[col] = v; };
+  setOpt('front_path', input.frontPath);
+  setOpt('back_path', input.backPath);
+  setOpt('supporting', input.supporting);
+  setOpt('shopify_cart_id', input.shopifyCartId);
+  setOpt('scent_code_2', input.scentCode2);
+  // design_mode: a provided value is normalized; omitted → column omitted (DB default / preserve).
+  if (input.designMode !== undefined) patch['design_mode'] = normalizeDesignMode(input.designMode);
+  // status: provided → set; omitted → column omitted (never silently downgrade checkout_pending→draft).
+  if (input.status !== undefined) patch['status'] = input.status;
+
+  if (isCreate) {
+    const { error } = await c.from('configurations').insert({ id: input.configId, ...patch });
+    if (error) {
+      // Idempotency: a concurrent create won the race (unique_violation on the id PK). Fall back
+      // to an UPDATE with the SAME omit-preserving patch — never a blanket upsert that would null
+      // omitted fields. Any other error is surfaced.
+      if ((error as any)?.code === '23505') {
+        const { error: uErr } = await c.from('configurations').update(patch).eq('id', input.configId);
+        if (uErr) return { ok:false, message: uErr.message };
+      } else {
+        return { ok:false, message: error.message };
+      }
+    }
+  } else {
+    const { error } = await c.from('configurations').update(patch).eq('id', input.configId);
+    if (error) return { ok:false, message: error.message };
+  }
   return { ok:true };
 }
 
@@ -254,36 +326,413 @@ export type HeldBenefit = { benefitType: BenefitType | null; benefitAmountCents:
 
 const RESERVE_TTL_MINUTES = 30;
 
-// The Shopify draft (invoice) currently attached to a configuration, if any.
-export async function getExistingDraftId(configId: string): Promise<string | null> {
+// §P0-1/§P0-5/§P0-6 OWNERSHIP-TOKEN CHECKOUT LEASE. Two nearly-simultaneous finalizeCheckout
+// calls for the SAME configuration must never each create a payable Shopify draft. claim_config_
+// checkout() (migration 0021) atomically grants a lease to at most one caller AND RETURNS A UNIQUE
+// TOKEN identifying that owner. release requires the matching token, so a stale owner (whose lease
+// already expired and was re-granted to a newer caller) can NEVER release the newer owner's lock.
+//   • real token   → this caller owns the lease → proceed
+//   • held (null)   → another in-flight finalize owns it → tell the customer to retry
+//   • RPC missing / any DB error → FAIL CLOSED (§P0-6): do NOT continue without the guard.
+// §P0-2 TTL was 90s; raised to 120s AND paired with an ownership REVALIDATION+renewal
+// (renewCheckoutLease) that runs immediately before the payment-critical Shopify create. The 15s
+// Shopify Admin timeout is far below the TTL, so create + read-back + persist always finish inside
+// one freshly-renewed lease window — no other request can reclaim the lease mid-operation. Token
+// ownership prevents a stale owner from releasing; the renewal check prevents a stale owner from
+// CONTINUING after a newer request has reclaimed.
+const CHECKOUT_LEASE_SECONDS = 120;
+const DEV_LEASE_TOKEN = 'dev-no-store';
+export type LeaseAcquire = { ok: true; token: string } | { ok: false; reason: 'in_progress' | 'error' };
+export async function acquireCheckoutLease(configId: string): Promise<LeaseAcquire> {
   const svc = createSupabaseServiceClient();
-  if (!svc) return null;
-  const { data } = await svc.from('configurations').select('shopify_cart_id').eq('id', configId).maybeSingle();
-  return (data as any)?.shopify_cart_id ?? null;
+  if (!svc) return { ok: true, token: DEV_LEASE_TOKEN };  // dev/unconfigured: single process, no store
+  const { data, error } = await svc.rpc('claim_config_checkout',
+    { p_config_id: configId, p_lease_seconds: CHECKOUT_LEASE_SECONDS });
+  const res = resolveLeaseClaim({ data, error: (error as any) ?? null });
+  if (!res.ok && res.reason === 'error') {
+    // Includes PGRST202/42883 (function absent → migration 0021 not applied). FAIL CLOSED (§P0-6).
+    console.error('[checkout] lease claim failed — failing closed:', (error as any)?.message ?? (error as any)?.code);
+  }
+  return res;
 }
 
-// If a benefit is currently reserved by a DIFFERENT, EXPIRED configuration, delete that
-// configuration's stale Shopify draft BEFORE we take the benefit over — so an old
-// discounted invoice can never remain payable in parallel with a new one (the double-spend
-// the brief warns about). Runs exactly at reuse time, the only moment the race can occur.
-async function invalidateStaleDraftForSampleCredit(svc: any, sampleOrderId: string, configId: string): Promise<void> {
-  const { data: srow } = await svc.from('sample_orders')
-    .select('credit_reserved_config_id, credit_reservation_expires_at').eq('id', sampleOrderId).maybeSingle();
-  const prior = srow?.credit_reserved_config_id;
-  const expired = srow?.credit_reservation_expires_at && new Date(srow.credit_reservation_expires_at).getTime() < Date.now();
-  if (prior && prior !== configId && expired) {
-    const { data: pc } = await svc.from('configurations').select('shopify_cart_id').eq('id', prior).maybeSingle();
-    if (pc?.shopify_cart_id) await deleteDraftOrder(pc.shopify_cart_id);
+// §P0-2 REVALIDATE + RENEW lease ownership right before a payment-critical transition (creating a
+// payable Shopify draft). Returns true ONLY if THIS token still owns the lease — and, when it does,
+// resets the lease clock (extends the TTL) so the create/persist finishes inside the window. Returns
+// FALSE (fail closed) when ownership was lost/reclaimed, the RPC is missing, or any DB error occurs —
+// the caller must then abort WITHOUT creating another payable draft.
+export async function renewCheckoutLease(configId: string, token: string): Promise<boolean> {
+  const svc = createSupabaseServiceClient();
+  if (!svc || token === DEV_LEASE_TOKEN) return true;     // dev/unconfigured: single process
+  const { data, error } = await svc.rpc('renew_config_checkout',
+    { p_config_id: configId, p_token: token, p_lease_seconds: CHECKOUT_LEASE_SECONDS });
+  if (error) {
+    console.error('[checkout] lease renew failed — failing closed:', (error as any)?.message ?? (error as any)?.code);
+    return false;                                         // §P0-2/§P0-6 missing RPC or DB error → fail closed
   }
+  return data === true;                                   // false ⇒ ownership lost (someone reclaimed)
 }
-async function invalidateStaleDraftForFirstOrder(svc: any, customerId: string, configId: string): Promise<void> {
-  const { data: claim } = await svc.from('first_order_claims')
-    .select('config_id, expires_at, state').eq('customer_id', customerId).maybeSingle();
-  const expired = claim?.expires_at && new Date(claim.expires_at).getTime() < Date.now();
-  if (claim?.state === 'reserved' && claim.config_id && claim.config_id !== configId && expired) {
-    const { data: pc } = await svc.from('configurations').select('shopify_cart_id').eq('id', claim.config_id).maybeSingle();
-    if (pc?.shopify_cart_id) await deleteDraftOrder(pc.shopify_cart_id);
+// Release ONLY if `token` still matches the current lease owner (enforced in SQL by
+// release_config_checkout). A stale owner's release is a no-op.
+export async function releaseCheckoutLease(configId: string, token: string): Promise<void> {
+  const svc = createSupabaseServiceClient();
+  if (!svc || token === DEV_LEASE_TOKEN) return;
+  try { await svc.rpc('release_config_checkout', { p_config_id: configId, p_token: token }); }
+  catch { /* best-effort; lease also self-expires */ }
+}
+
+// §OPTION-3 CHECKOUT-INTENT IDEMPOTENCY. A durable per-configuration record written BEFORE the
+// Shopify draft is created, so a hard process death between Shopify create and BUGO persistence
+// cannot cause a retry to blindly mint a SECOND payable draft. Classifies the current durable
+// state so the caller can create / reuse / delete-confirm / fail closed.
+export type IntentDecision =
+  | { ok: true; state: 'created' }                                  // safe to create a new draft
+  | { ok: true; state: 'existing_draft'; draftId: string }         // §4 ALWAYS a non-empty id
+  | { ok: false; state: 'unknown_pending' }                        // hard crash window → FAIL CLOSED
+  | { ok: false; state: 'not_owner' }                              // another finalize in-flight
+  | { ok: false; state: 'error' };                                 // DB error / unreadable → FAIL CLOSED
+
+export async function beginCheckoutIntent(args: {
+  configId: string; token: string; source: 'main_checkout'|'sample_checkout';
+  sampleOrderId: string | null; benefitType: string | null; benefitAmountCents: number;
+  expectedTotalCents: number; expectedCurrency?: string;
+}): Promise<IntentDecision> {
+  const svc = createSupabaseServiceClient();
+  if (!svc) return { ok: true, state: 'created' };                  // dev/unconfigured: single process
+  const { data, error } = await svc.rpc('begin_checkout_intent', {
+    p_config_id: args.configId, p_token: args.token, p_source: args.source,
+    p_sample_order_id: args.sampleOrderId, p_benefit_type: args.benefitType,
+    p_benefit_amount_cents: args.benefitAmountCents, p_expected_total_cents: args.expectedTotalCents,
+    p_expected_currency: args.expectedCurrency ?? 'EUR',
+  });
+  if (error) {
+    console.error('[checkout] begin_checkout_intent failed — failing closed:', (error as any)?.message ?? (error as any)?.code);
+    return { ok: false, state: 'error' };
   }
+  const state = data as string;
+  if (state === 'created') return { ok: true, state: 'created' };
+  if (state === 'existing_draft') {
+    // §4 FAIL CLOSED unless we POSITIVELY read a non-empty draft id. A get-intent error, an empty
+    // result, or a missing/blank shopify_draft_order_id must NEVER become existing_draft/null.
+    const r = await svc.rpc('get_checkout_intent', { p_config_id: args.configId });
+    if ((r as any).error) {
+      console.error('[checkout] get_checkout_intent failed — failing closed:', ((r as any).error)?.message);
+      return { ok: false, state: 'error' };
+    }
+    const row = (r.data as any)?.[0];
+    const draftId = typeof row?.shopify_draft_order_id === 'string' ? row.shopify_draft_order_id.trim() : '';
+    if (!draftId) {
+      console.error('[checkout] existing_draft with no readable draft id — failing closed');
+      return { ok: false, state: 'error' };
+    }
+    return { ok: true, state: 'existing_draft', draftId };
+  }
+  if (state === 'unknown_pending') return { ok: false, state: 'unknown_pending' };
+  if (state === 'not_owner') return { ok: false, state: 'not_owner' };
+  return { ok: false, state: 'error' };
+}
+
+// Record the Shopify draft id on the intent AFTER a successful create (token-owned). false ⇒ lost
+// ownership → caller must fail closed (delete the just-created draft / record orphan).
+export async function attachCheckoutIntentDraft(configId: string, token: string, draftId: string): Promise<boolean> {
+  const svc = createSupabaseServiceClient();
+  if (!svc) return true;
+  const { data, error } = await svc.rpc('attach_checkout_intent_draft',
+    { p_config_id: configId, p_token: token, p_draft_id: draftId });
+  if (error) { console.error('[checkout] attach_checkout_intent_draft failed:', (error as any)?.message); return false; }
+  return data === true;
+}
+
+// Mark the intent resolved (checkout completed) or superseded (prior draft confirmed deleted).
+export async function resolveCheckoutIntent(configId: string, token: string, status: 'resolved'|'superseded'): Promise<boolean> {
+  const svc = createSupabaseServiceClient();
+  if (!svc) return true;
+  const { data, error } = await svc.rpc('resolve_checkout_intent',
+    { p_config_id: configId, p_token: token, p_status: status });
+  if (error) { console.error('[checkout] resolve_checkout_intent failed:', (error as any)?.message); return false; }
+  return data === true;
+}
+
+
+// FAIL CLOSED: a DB error returns { ok:false } — the caller must NOT treat it as "no draft"
+// (that would let checkout create a SECOND payable draft). Only a successful read yields draftId.
+export type DraftLookupResult = { ok: true; draftId: string | null } | { ok: false };
+export async function getExistingDraftId(configId: string): Promise<DraftLookupResult> {
+  const svc = createSupabaseServiceClient();
+  if (!svc) return { ok: true, draftId: null };           // dev/unconfigured
+  const r = await svc.from('configurations').select('shopify_cart_id').eq('id', configId).maybeSingle();
+  return resolveDraftLookup(r as any);
+}
+
+// §OPTION-3-v2 #1 authoritative cross-config payment-risk classification (config + intent + orphan).
+export type PriorRisk =
+  | { ok: true; risk: 'safe' }
+  | { ok: true; risk: 'existing_draft'; draftId: string }
+  | { ok: false; risk: 'blocked' }
+  | { ok: false; risk: 'error' };
+export async function priorConfigPaymentRisk(svc: any, priorConfigId: string): Promise<PriorRisk> {
+  const r = await svc.rpc('prior_config_payment_risk', { p_prior_config_id: priorConfigId });
+  if (r.error) { console.error('[checkout] prior_config_payment_risk failed — failing closed:', r.error.message); return { ok: false, risk: 'error' }; }
+  const row = (r.data as any)?.[0];
+  const risk = row?.risk as string;
+  if (risk === 'safe') return { ok: true, risk: 'safe' };
+  if (risk === 'existing_draft') {
+    const id = typeof row?.draft_id === 'string' ? row.draft_id.trim() : '';
+    if (!id) return { ok: false, risk: 'blocked' };
+    return { ok: true, risk: 'existing_draft', draftId: id };
+  }
+  return { ok: false, risk: 'blocked' };
+}
+export async function supersedePriorConfigDraft(svc: any, priorConfigId: string, draftId: string): Promise<boolean> {
+  const r = await svc.rpc('supersede_prior_config_draft', { p_prior_config_id: priorConfigId, p_draft_id: draftId });
+  if (r.error) { console.error('[checkout] supersede_prior_config_draft failed:', r.error.message); return false; }
+  return true;
+}
+// §OPTION-3-v3 #7 race-safe post-delete certification: revalidate fence/expected-draft/intent/orphan
+// atomically and return whether the prior config is SAFE_FOR_BENEFIT_TAKEOVER. false → no benefit.
+export async function certifyPriorConfigSuperseded(svc: any, priorConfigId: string, expectedDraftId: string): Promise<boolean> {
+  const r = await svc.rpc('certify_prior_config_superseded', { p_prior_config_id: priorConfigId, p_expected_draft_id: expectedDraftId });
+  if (r.error) { console.error('[checkout] certify_prior_config_superseded failed:', r.error.message); return false; }
+  return r.data === true;
+}
+// §OPTION-3-v4 #1 PRE-DELETE takeover fence (0030). Atomically decide, BEFORE any external delete,
+// whether the prior config's benefit may be taken: a LIVE prior lease → 'blocked' (do NOT delete);
+// an expired lease → install a fence token (so the old worker's renew immediately fails) and report
+// the known draft id to delete. decision ∈ 'blocked' | 'fenced_safe' | 'fenced_delete'.
+export type FenceDecision =
+  | { decision: 'blocked' }
+  | { decision: 'fenced_safe' }
+  | { decision: 'fenced_delete'; draftId: string };
+export async function fencePriorConfigForTakeover(svc: any, priorConfigId: string, fenceToken: string): Promise<FenceDecision> {
+  const r = await svc.rpc('fence_prior_config_for_takeover', { p_prior_config_id: priorConfigId, p_fence_token: fenceToken, p_lease_ttl_seconds: 120 });
+  if (r.error) { console.error('[checkout] fence_prior_config_for_takeover failed — failing closed:', r.error.message); return { decision: 'blocked' }; }
+  const row = (r.data as any)?.[0];
+  const decision = row?.decision as string;
+  if (decision === 'fenced_delete') {
+    const id = typeof row?.draft_id === 'string' ? row.draft_id.trim() : '';
+    if (!id) return { decision: 'blocked' };   // fenced_delete with no id is incoherent → fail closed
+    return { decision: 'fenced_delete', draftId: id };
+  }
+  if (decision === 'fenced_safe') return { decision: 'fenced_safe' };
+  return { decision: 'blocked' };
+}
+// §OPTION-3-v4 #1 FENCE-AWARE post-delete certification (0031). Recognizes OUR OWN fence token as
+// "ours" instead of rejecting it as a competing live lease; certifies + supersedes both references.
+export async function certifyPriorConfigFenced(svc: any, priorConfigId: string, fenceToken: string, expectedDraftId: string): Promise<boolean> {
+  const r = await svc.rpc('certify_prior_config_fenced', { p_prior_config_id: priorConfigId, p_fence_token: fenceToken, p_expected_draft_id: expectedDraftId });
+  if (r.error) { console.error('[checkout] certify_prior_config_fenced failed:', r.error.message); return false; }
+  return r.data === true;
+}
+// §OPTION-3-v2 #3/#5 ownership-gated atomic persist of shopify_cart_id + intent draft (one txn).
+export async function persistConfigDraftOwned(configId: string, token: string, draftId: string): Promise<boolean> {
+  const svc = createSupabaseServiceClient();
+  if (!svc) return true;
+  const { data, error } = await svc.rpc('persist_config_draft_owned', { p_config_id: configId, p_token: token, p_draft_id: draftId });
+  if (error) { console.error('[checkout] persist_config_draft_owned failed — failing closed:', (error as any)?.message); return false; }
+  return data === true;
+}
+export async function resolveConfigIntentOwned(configId: string, token: string): Promise<boolean> {
+  const svc = createSupabaseServiceClient();
+  if (!svc) return true;
+  const { data, error } = await svc.rpc('resolve_config_intent_owned', { p_config_id: configId, p_token: token });
+  if (error) { console.error('[checkout] resolve_config_intent_owned failed:', (error as any)?.message); return false; }
+  return data === true;
+}
+// §OPTION-3-v2 #2 stable sample idempotency: same key → same sample_orders row.
+export type SampleSubject = { id: string; isNew: boolean; paymentState: string; draftId: string | null; invoiceUrl: string | null; amountCents: number; creditCents: number; currency: string } | null;
+export async function getOrCreateSampleOrder(svc: any, args: {
+  idempotencyKey: string; authUserId: string | null; customerId: string | null; email: string | null;
+  locale: string; amountCents: number; creditCents: number;
+}): Promise<SampleSubject> {
+  const r = await svc.rpc('get_or_create_sample_order', {
+    p_idempotency_key: args.idempotencyKey, p_auth_user_id: args.authUserId, p_customer_id: args.customerId,
+    p_email: args.email, p_locale: args.locale, p_amount_cents: args.amountCents, p_credit_cents: args.creditCents });
+  if (r.error) { console.error('[sample] get_or_create_sample_order failed:', r.error.message); return null; }
+  const row = (r.data as any)?.[0];
+  if (!row) return null;
+  return { id: row.id, isNew: row.is_new, paymentState: row.payment_state,
+    draftId: row.shopify_draft_order_id ?? null, invoiceUrl: row.shopify_invoice_url ?? null,
+    amountCents: row.amount_cents, creditCents: row.credit_cents, currency: row.currency ?? 'EUR' };
+}
+// §DEFECT-2 persist the payable invoice URL so an idempotent retry can resume the SAME checkout.
+export async function setSampleInvoice(svc: any, sampleOrderId: string, draftId: string, invoiceUrl: string): Promise<boolean> {
+  const r = await svc.rpc('set_sample_invoice', { p_sample_order_id: sampleOrderId, p_draft_id: draftId, p_invoice_url: invoiceUrl });
+  if (r.error) { console.error('[sample] set_sample_invoice failed:', r.error.message); return false; }
+  return r.data === true;   // §OPTION-3-v4 #9 RPC proves exactly one row updated
+}
+// §OPTION-3-v4 #5 classify the COMBINED main recovery state so config+intent referencing the SAME
+// draft is ONE deletion obligation.
+export async function classifyMainDraftRecovery(svc: any, configId: string): Promise<{ draftId: string | null; bothRef: boolean; intentStatus: string | null }> {
+  const r = await svc.rpc('classify_main_draft_recovery', { p_config_id: configId });
+  if (r.error) { console.error('[checkout] classify_main_draft_recovery failed:', r.error.message); return { draftId: null, bothRef: false, intentStatus: null }; }
+  const row = (r.data as any)?.[0];
+  return { draftId: row?.draft_id ?? null, bothRef: row?.both_ref === true, intentStatus: row?.intent_status ?? null };
+}
+export async function supersedeMainDraftCoherent(svc: any, configId: string, draftId: string): Promise<boolean> {
+  const r = await svc.rpc('supersede_main_draft_coherent', { p_config_id: configId, p_draft_id: draftId });
+  if (r.error) { console.error('[checkout] supersede_main_draft_coherent failed:', r.error.message); return false; }
+  return true;
+}
+// §OPTION-3-v4 #4 ONE owner-gated atomic transition clearing config.shopify_cart_id AND superseding
+// the intent, after the single external draft is confirmed gone. Replaces the self-conflicting
+// (owner-agnostic supersede) + (second expected-old-id clear) pair. false → lost ownership → fail closed.
+export async function supersedeMainDraftOwned(configId: string, token: string, draftId: string | null): Promise<boolean> {
+  const svc = createSupabaseServiceClient();
+  if (!svc) return true;
+  const { data, error } = await svc.rpc('supersede_main_draft_owned', { p_config_id: configId, p_token: token, p_draft_id: draftId });
+  if (error) { console.error('[checkout] supersede_main_draft_owned failed — failing closed:', (error as any)?.message); return false; }
+  return data === true;
+}
+// §OPTION-3-v4 #7 record draft id AND invoice URL on the intent atomically (crash-window-safe).
+export async function attachIntentDraftUrl(svc: any, configOrSubjectId: string, token: string, draftId: string, invoiceUrl: string): Promise<boolean> {
+  const r = await svc.rpc('attach_intent_draft_url', { p_config_id: configOrSubjectId, p_token: token, p_draft_id: draftId, p_invoice_url: invoiceUrl });
+  if (r.error) { console.error('[checkout] attach_intent_draft_url failed:', r.error.message); return false; }
+  return r.data === true;
+}
+// Recovery source when sample_orders URL was never written (process died between attach and persist).
+export async function getIntentInvoiceUrl(svc: any, configOrSubjectId: string): Promise<{ draftId: string | null; invoiceUrl: string | null; status: string | null }> {
+  const r = await svc.rpc('get_intent_invoice_url', { p_config_id: configOrSubjectId });
+  if (r.error) { console.error('[checkout] get_intent_invoice_url failed:', r.error.message); return { draftId: null, invoiceUrl: null, status: null }; }
+  const row = (r.data as any)?.[0];
+  return { draftId: row?.shopify_draft_order_id ?? null, invoiceUrl: row?.invoice_url ?? null, status: row?.status ?? null };
+}
+// §OPTION-3-v4 #3A owner-gated prior-draft clear with expected-id matching.
+export async function clearConfigDraftOwned(configId: string, token: string, expectedDraftId: string | null): Promise<boolean> {
+  const svc = createSupabaseServiceClient();
+  if (!svc) return true;
+  const { data, error } = await svc.rpc('clear_config_draft_owned', { p_config_id: configId, p_token: token, p_expected_draft_id: expectedDraftId });
+  if (error) { console.error('[checkout] clear_config_draft_owned failed:', (error as any)?.message); return false; }
+  return data === true;
+}
+// §OPTION-3-v4 #3B owner-gated checkout snapshot persist.
+export async function persistConfigSnapshotOwned(configId: string, token: string, status: string, snapshot: unknown): Promise<boolean> {
+  const svc = createSupabaseServiceClient();
+  if (!svc) return true;
+  const { data, error } = await svc.rpc('persist_config_snapshot_owned', { p_config_id: configId, p_token: token, p_status: status, p_snapshot: snapshot });
+  if (error) { console.error('[checkout] persist_config_snapshot_owned failed:', (error as any)?.message); return false; }
+  return data === true;
+}
+// §OPTION-3-v4 #3 owner-gated persist of the COMPLETE CANONICAL finalize checkout state (pricing
+// breakdown + benefit + free-sample flags + auth identity + artwork) in ONE statement gated on the
+// current lease token — replacing the token-UNGATED upsertConfiguration finalize write. A stale
+// worker (lease reclaimed) matches zero rows → false. This must persist EVERYTHING the removed
+// finalize upsert wrote so admin/webhook never see stale pre-finalize pricing or lose artwork.
+// Artwork paths (front/back): undefined → omit (leave unchanged); null → explicit "no upload for this
+// side" (clears the column); a string → store that path. `supporting`: undefined → omit; an array →
+// replace (pass [] to explicitly clear). Both map the app-level tri-state onto the RPC sentinels.
+export async function persistConfigCheckoutOwned(args: {
+  configId: string; token: string; status: string;
+  basePriceCents: number; surchargeCents: number; totalPriceCents: number; unitRateCents: number;
+  preBenefitTotalCents: number; savingsCents: number;
+  benefitType: string | null; benefitAmountCents: number; sampleOrderId: string | null;
+  freeSampleSet: boolean; freeSampleSource: string | null; authUserId: string | null;
+  frontPath?: string | null; backPath?: string | null;
+  supporting?: { field: string; path: string }[]; snapshot?: unknown;
+}): Promise<boolean> {
+  const svc = createSupabaseServiceClient();
+  if (!svc) return true;
+  const pathArg = (v: string | null | undefined): string | null => v === undefined ? null : (v === null ? '' : v);
+  const { data, error } = await svc.rpc('persist_config_checkout_owned', {
+    p_config_id: args.configId, p_token: args.token, p_status: args.status,
+    p_base_price_cents: args.basePriceCents, p_surcharge_cents: args.surchargeCents,
+    p_total_price_cents: args.totalPriceCents, p_unit_rate_cents: args.unitRateCents,
+    p_pre_benefit_total_cents: args.preBenefitTotalCents, p_savings_cents: args.savingsCents,
+    p_benefit_type: args.benefitType, p_benefit_amount_cents: args.benefitAmountCents,
+    p_sample_order_id: args.sampleOrderId,
+    p_free_sample_set: args.freeSampleSet, p_free_sample_source: args.freeSampleSource,
+    p_auth_user_id: args.authUserId,
+    p_front_path: pathArg(args.frontPath), p_back_path: pathArg(args.backPath),
+    p_supporting: args.supporting === undefined ? null : args.supporting,
+    p_snapshot: args.snapshot ?? null,
+  });
+  if (error) { console.error('[checkout] persist_config_checkout_owned failed — failing closed:', (error as any)?.message); return false; }
+  return data === true;
+}
+// §OPTION-3-v4 #2 pre-create benefit revalidation: prove the benefit still belongs to THIS config.
+// The caller passes the AUTH user id; revalidate_benefit_owned matches first_order_claims.customer_id
+// = customers.id (NOT auth.users.id), so we resolve customers.id here — exactly as reserve/release do
+// — before the RPC. Passing the raw auth id would match no claim and spuriously fail closed.
+export async function revalidateBenefitOwned(args: { benefitType: string | null; configId: string; authUserId: string | null; sampleOrderId: string | null }): Promise<boolean> {
+  if (!args.benefitType) return true;   // no discount to protect
+  const svc = createSupabaseServiceClient();
+  if (!svc) return true;
+  let customerId: string | null = null;
+  if (args.benefitType === 'first_order_5pct') {
+    // first_order requires the real customers.id; without it there is nothing to revalidate → fail closed.
+    if (!args.authUserId) { console.error('[checkout] revalidate_benefit_owned: no auth user for first_order — failing closed'); return false; }
+    const { data: cust, error: cErr } = await svc.from('customers').select('id').eq('auth_user_id', args.authUserId).maybeSingle();
+    if (cErr) { console.error('[checkout] revalidate_benefit_owned: customer lookup failed — failing closed:', (cErr as any)?.message); return false; }
+    if (!cust) { console.error('[checkout] revalidate_benefit_owned: no customer row for auth user — failing closed'); return false; }
+    customerId = cust.id;
+  }
+  const { data, error } = await svc.rpc('revalidate_benefit_owned', {
+    p_benefit_type: args.benefitType, p_config_id: args.configId,
+    p_customer_id: customerId, p_sample_order_id: args.sampleOrderId });
+  if (error) { console.error('[checkout] revalidate_benefit_owned failed — failing closed:', (error as any)?.message); return false; }
+  return data === true;
+}
+
+// §P0-2 If a benefit is currently reserved by a DIFFERENT, EXPIRED configuration, that
+// configuration's stale Shopify draft MUST be deleted BEFORE we take the benefit over — so an
+// old discounted invoice can never remain payable in parallel with a new one (the double-spend
+// the brief warns about). Returns TRUE only when it is safe to proceed: either there is no
+// blocking stale draft, or one existed and Shopify CONFIRMED its deletion. Returns FALSE when a
+// stale payable draft exists but could not be confirmed deleted → the caller must FAIL CLOSED
+// (grant no benefit) rather than create a second discounted invoice.
+// §OPTION-3-v2 #1 Prove a PRIOR configuration carries no unresolved payment risk before a stale
+// benefit reservation may move to a new config. Checks ALL authoritative surfaces atomically
+// (configurations.shopify_cart_id + checkout_intents + open checkout_orphan_drafts), not just
+// shopify_cart_id. Returns true ONLY when: no risk (safe), OR a known prior draft that we then
+// CONFIRM-DELETE and durably transition to superseded. Any block/unknown/error → false (fail closed).
+async function priorConfigProvenSafe(svc: any, priorConfigId: string): Promise<boolean> {
+  // §OPTION-3-v4 #1 PRE-DELETE FENCE. Before touching any external Shopify draft, atomically fence
+  // the prior config: a LIVE prior lease MUST block the takeover BEFORE deletion (never delete a
+  // draft a concurrent worker may be paying against); an EXPIRED lease is fenced BEFORE deletion by
+  // installing a fence token, so the old worker's renew immediately fails and no fresh normal
+  // checkout can start on the prior config while we take its benefit over.
+  const fenceToken = randomUUID();
+  const fence = await fencePriorConfigForTakeover(svc, priorConfigId, fenceToken);
+  if (fence.decision === 'blocked') return false;          // live lease / uncertainty → fail closed
+  if (fence.decision === 'fenced_safe') {
+    // Fenced, no known external draft to delete → certify directly. The certifier recognizes OUR
+    // fence token (not a competing live lease) and supersedes both references.
+    return await certifyPriorConfigFenced(svc, priorConfigId, fenceToken, '');
+  }
+  // fenced_delete: a known payable (possibly discounted) draft exists. Delete-confirm the SINGLE
+  // external draft (network call, OUTSIDE any DB txn) AFTER the fence is installed, then certify.
+  const deleted = await deleteDraftOrder(fence.draftId);
+  if (!deleted) return false;                              // deletion unconfirmed → fail closed
+  // Post-delete certification MUST recognize/verify our expected fence token so the old 0029
+  // live-lease check does not reject our own freshly-installed fence.
+  return await certifyPriorConfigFenced(svc, priorConfigId, fenceToken, fence.draftId);
+}
+
+async function invalidateStaleDraftForSampleCredit(svc: any, sampleOrderId: string, configId: string): Promise<boolean> {
+  const read = await svc.from('sample_orders')
+    .select('credit_reserved_config_id, credit_reservation_expires_at').eq('id', sampleOrderId).maybeSingle();
+  // §P0-4 every read is checked; any error → cannot prove safe → fail closed (grant no benefit).
+  const dec = staleReservationDecision({
+    read: { data: read.data ? { reserved_config_id: read.data.credit_reserved_config_id, reservation_expires_at: read.data.credit_reservation_expires_at } : null, error: read.error },
+    currentConfigId: configId, nowMs: Date.now(),
+  });
+  if (!dec.ok) return false;
+  if (!dec.priorConfigId) return true;                     // nothing stale blocking us
+  // §OPTION-3-v2 #1 inspect ALL payment-risk surfaces of the prior config, not just shopify_cart_id.
+  return await priorConfigProvenSafe(svc, dec.priorConfigId);
+}
+async function invalidateStaleDraftForFirstOrder(svc: any, customerId: string, configId: string): Promise<boolean> {
+  const read = await svc.from('first_order_claims')
+    .select('config_id, expires_at, state').eq('customer_id', customerId).maybeSingle();
+  if (read.error) return false;                            // §P0-4 fail closed
+  const claim = read.data;
+  const dec = staleReservationDecision({
+    read: { data: claim ? { reserved_config_id: claim.config_id, reservation_expires_at: claim.expires_at } : null, error: null },
+    currentConfigId: configId, nowMs: Date.now(),
+  });
+  if (!dec.ok) return false;
+  if (!dec.priorConfigId || claim?.state !== 'reserved') return true;
+  // §OPTION-3-v2 #1 inspect ALL payment-risk surfaces of the prior config, not just shopify_cart_id.
+  return await priorConfigProvenSafe(svc, dec.priorConfigId);
 }
 
 export async function reserveBenefitForCheckout(priced: PricedOk, configId: string): Promise<HeldBenefit> {
@@ -293,7 +742,10 @@ export async function reserveBenefitForCheckout(priced: PricedOk, configId: stri
   if (!svc) return dropped;
 
   if (priced.benefitType === 'sample_credit' && priced.sampleOrderId) {
-    await invalidateStaleDraftForSampleCredit(svc, priced.sampleOrderId, configId);
+    // §P0-2 FAIL CLOSED: if an old discounted draft for this credit can't be confirmed deleted,
+    // do NOT reserve — the customer pays the full pre-benefit price instead of double-spending.
+    const safe = await invalidateStaleDraftForSampleCredit(svc, priced.sampleOrderId, configId);
+    if (!safe) return dropped;
     const { data, error } = await svc.rpc('reserve_sample_credit',
       { p_sample_order_id: priced.sampleOrderId, p_config_id: configId, p_ttl_minutes: RESERVE_TTL_MINUTES });
     if (error || data !== true) return dropped;
@@ -303,7 +755,9 @@ export async function reserveBenefitForCheckout(priced: PricedOk, configId: stri
   if (priced.benefitType === 'first_order_5pct' && priced.authUserId) {
     const { data: cust } = await svc.from('customers').select('id').eq('auth_user_id', priced.authUserId).maybeSingle();
     if (!cust) return dropped;
-    await invalidateStaleDraftForFirstOrder(svc, cust.id, configId);
+    // §P0-2 FAIL CLOSED (same rule as the sample credit above).
+    const safe = await invalidateStaleDraftForFirstOrder(svc, cust.id, configId);
+    if (!safe) return dropped;
     const { data, error } = await svc.rpc('reserve_first_order',
       { p_customer_id: cust.id, p_config_id: configId, p_ttl_minutes: RESERVE_TTL_MINUTES });
     if (error || data !== true) return dropped;
@@ -312,18 +766,22 @@ export async function reserveBenefitForCheckout(priced: PricedOk, configId: stri
   return dropped;
 }
 
-// Release a reservation held by this configuration (checkout aborted / total mismatch).
-// Best-effort; expired reservations also free themselves via the RPC WHERE clauses.
-export async function releaseHeldBenefit(held: HeldBenefit, configId: string, authUserId: string | null): Promise<void> {
+// §P0-1 OWNERSHIP-GATED release of a reservation held by this configuration (checkout aborted /
+// total mismatch). `leaseToken` is the checkout lease token the caller acquired; the release RPCs
+// (migration 0023) clear the reservation ONLY when this token still matches the configuration's
+// current lease owner — so a STALE request that has lost the lease can never release the
+// reservation the CURRENT owner is using. A stale caller is a safe no-op; the reservation stays
+// with the current owner or expires by its own TTL. Best-effort otherwise.
+export async function releaseHeldBenefit(held: HeldBenefit, configId: string, authUserId: string | null, leaseToken: string): Promise<void> {
   if (!held.benefitType) return;
   const svc = createSupabaseServiceClient();
-  if (!svc) return;
+  if (!svc || leaseToken === DEV_LEASE_TOKEN) return;   // dev/unconfigured: single process, no store
   try {
     if (held.benefitType === 'sample_credit' && held.sampleOrderId) {
-      await svc.rpc('release_sample_credit', { p_sample_order_id: held.sampleOrderId, p_config_id: configId });
+      await svc.rpc('release_sample_credit_if_owner', { p_sample_order_id: held.sampleOrderId, p_config_id: configId, p_token: leaseToken });
     } else if (held.benefitType === 'first_order_5pct' && authUserId) {
       const { data: cust } = await svc.from('customers').select('id').eq('auth_user_id', authUserId).maybeSingle();
-      if (cust) await svc.rpc('release_first_order', { p_customer_id: cust.id, p_config_id: configId });
+      if (cust) await svc.rpc('release_first_order_if_owner', { p_customer_id: cust.id, p_config_id: configId, p_token: leaseToken });
     }
   } catch { /* best-effort */ }
 }

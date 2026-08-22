@@ -9,9 +9,10 @@ export const metadata = { title: 'Sipariş · BUGO DUFT' };
 function Addr({ a }:{ a:any }){ if(!a) return <span className="muted">—</span>;
   return <span>{[a.name,a.address1,a.address2,[a.zip,a.city].filter(Boolean).join(' '),a.country].filter(Boolean).join(', ')}</span>; }
 
-export default async function OrderDetail({ params }:{ params:{ id:string } }){
+export default async function OrderDetail({ params }:{ params: Promise<{ id:string }> }){
+  const { id } = await params;                      // §HIGH-16 Next.js 15 async params
   await requireAdmin();
-  const o:any = await getOrder(params.id);
+  const o:any = await getOrder(id);
   if(!o) notFound();
   const c = o.configurations ?? {};
   const so = o.sampleOrder ?? null;
@@ -63,7 +64,7 @@ export default async function OrderDetail({ params }:{ params:{ id:string } }){
                 {kv('Menge',c.quantity!=null?`${formatQty(c.quantity,'de')} Stück`:'—')}
                 {kv('Duft',c.scent_code||'—')}
                 {c.scent_code_2 && kv('Duft 2 (kostenlos)',c.scent_code_2)}
-                {kv('Duftintensität',c.intensity==='intense'?'Intensivduft (+30,00 €)':'Normalduft')}
+                {kv('Duftintensität',c.intensity==='intense'?`Intensivduft (+${formatMoney(c.surcharge_cents ?? 0,'EUR','de')}${c.quantity?` · ${formatMoney(Math.round((c.surcharge_cents ?? 0)/(c.quantity/1000)),'EUR','de')}/1.000`:''})`:'Normalduft')}
                 {kv('Form',c.shape||'—')}
                 {kv('Designmodus',c.design_mode==='ready_file'?'Fertige Druckdatei':'BUGO erstellt Design')}
                 {c.unit_rate_cents!=null && kv('Fiyat / 1.000',formatMoney(c.unit_rate_cents,'EUR','de'))}

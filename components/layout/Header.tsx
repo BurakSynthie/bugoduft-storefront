@@ -12,8 +12,8 @@ import CartButton from '@/components/storefront/CartButton';
 import { useStorefront } from '@/lib/cart/store';
 
 type NavItem = { label: string; href: string };
-export default function Header({ locale, dict, nav, alternates }:
-  { locale: Locale; dict: Dict; nav: NavItem[]; alternates: Partial<Record<Locale,string>> }) {
+export default function Header({ locale, dict, nav, alternates, brand, brandLogo }:
+  { locale: Locale; dict: Dict; nav: NavItem[]; alternates: Partial<Record<Locale,string>>; brand?: string; brandLogo?: string | null }) {
   const [scrolled, setScrolled] = useState(false);
   const { openSearch, openMenu } = useStorefront();
   useEffect(() => {
@@ -23,19 +23,28 @@ export default function Header({ locale, dict, nav, alternates }:
     window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+  // §B single brand source for the header logo (text fallback when no logo asset is set).
+  const brandLabel = brand || 'BUGO DUFT';
   return (
     <header className={`header ${scrolled ? 'header--scrolled' : ''}`}>
       <div className="container header__inner">
-        <Link className="logo" href={`/${locale}`}><span className="logo__mark" />BUGO&nbsp;DUFT</Link>
+        <Link className="logo" href={`/${locale}`}>
+          {brandLogo
+            ? <img className="logo__img" src={brandLogo} alt={brandLabel} />
+            : <><span className="logo__mark" /><span className="logo__text">{brandLabel}</span></>}
+        </Link>
         <nav className="nav" aria-label={dict.common.menu}>
           {nav.map(n => <Link key={n.href} href={n.href}>{n.label}</Link>)}
         </nav>
         <div className="header__actions">
+          {/* §P compact mobile header: Logo | language | search | cart | menu.
+              Language stays visible via the compact switcher; Account moves into the burger
+              drawer to keep the small-viewport header within the screen width. */}
           <div className="hide-mobile"><LanguageSwitcher current={locale} alternates={alternates} /></div>
           <div className="hide-mobile"><CurrencySwitcher /></div>
           <span className="only-mobile"><QuickLangSwitcher current={locale} alternates={alternates} /></span>
           <button className="iconbtn" aria-label={dict.common.search} onClick={openSearch}><IconSearch /></button>
-          <Link className="iconbtn" href={`/${locale}/konto`} aria-label="Konto">
+          <Link className="iconbtn hide-mobile" href={`/${locale}/konto`} aria-label="Konto">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
           </Link>
           <CartButton locale={locale} />

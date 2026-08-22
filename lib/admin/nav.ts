@@ -14,6 +14,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
   ] },
   { group: 'İçerik', items: [
     { label: 'Ana Sayfa', href: '/admin/ana-sayfa' },
+    { label: 'Blog', href: '/admin/blog' },
     { label: 'Çeviriler', href: '/admin/ceviriler' },
     { label: 'SEO', href: '/admin/seo' },
   ] },

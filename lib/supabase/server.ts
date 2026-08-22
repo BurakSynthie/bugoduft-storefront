@@ -4,13 +4,18 @@ import { createClient } from '@supabase/supabase-js';
 import { supabaseEnv, isSupabaseConfigured, assertServer } from './env';
 
 // RLS-scoped server client (anon key + user session cookies). null when unconfigured.
+// §HIGH-16 Next.js 15: cookies() is now ASYNC. The @supabase/ssr cookie adapter awaits getAll/
+// setAll, so we resolve the cookie store lazily inside them — keeping this factory synchronous so
+// its many callers stay unchanged.
 export function createSupabaseServerClient() {
   if (!isSupabaseConfigured()) return null;
-  const cookieStore = cookies();
   return createServerClient(supabaseEnv.url, supabaseEnv.anonKey, {
     cookies: {
-      getAll() { return cookieStore.getAll(); },
-      setAll(list) { try { list.forEach(({ name, value, options }) => cookieStore.set(name, value, options)); } catch {} },
+      async getAll() { return (await cookies()).getAll(); },
+      async setAll(list) {
+        try { const store = await cookies(); list.forEach(({ name, value, options }) => store.set(name, value, options)); }
+        catch { /* called from a Server Component render — cookies are read-only there */ }
+      },
     },
   });
 }

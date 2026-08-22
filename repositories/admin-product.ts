@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { CMS_BUCKET } from '@/lib/media/types';
 import { locales, type Locale } from '@/i18n/config';
 import { itemPath } from '@/lib/routing';
+import { validateTiers, validateQtyRules, validateTierCoverage } from '@/lib/pricing/tier-input';
 
 export type MediaRef = { id: string; url: string; type: 'image' | 'video' };
 export type ProductTr = {
@@ -123,22 +124,36 @@ export async function saveProduct(input: ProductSaveInput): Promise<SaveResult> 
   for (const l of locales) if (!input.tr[l].name.trim() || !input.tr[l].slug.trim())
     return { ok: false, message: `Ad ve slug zorunlu (${l.toUpperCase()}).` };
 
-  const { data: prod, error: lookErr } = await sb.from('products').select('id').eq('product_code', input.productCode).maybeSingle();
-  if (lookErr) return { ok: false, message: lookErr.message };
-  if (!prod) return { ok: false, message: `Ürün bulunamadı: ${input.productCode}` };
-  const productId = prod.id as string;
+  // §HIGH-6 / §HIGH-7 — validate ALL remaining input (quantity envelope + price tiers) BEFORE
+  // any DB mutation, so a bad quantity rule or a duplicate/out-of-range tier can never leave the
+  // product half-written (products.update + translations + gallery already committed). The
+  // per-product envelope must align to the canonical 1.000-block grid that the storefront,
+  // server pricing and the configurations.quantity DB CHECK all share.
+  const qtyCheck = validateQtyRules({ minQty: input.minQty, maxQty: input.maxQty, qtyStep: input.qtyStep });
+  if (!qtyCheck.ok) return { ok: false, message: qtyCheck.error };
+  const tiersCheck = validateTiers(input.tiers ?? []);
+  if (!tiersCheck.ok) return { ok: false, message: tiersCheck.error };
+  const cleanTiers = tiersCheck.tiers;
+  // §P0/HIGH-12 TIER COVERAGE INVARIANT: refuse to save a product whose min_qty has no ACTIVE
+  // covering tier — otherwise the product would be unpriceable (pickTier would return null / the
+  // old code would mis-price at a bulk rate). Validated here AND re-checked inside the RPC.
+  const coverage = validateTierCoverage(cleanTiers, input.minQty);
+  if (!coverage.ok) return { ok: false, message: coverage.error };
 
-  const upd = await sb.from('products').update({
+  // §HIGH-10 ATOMICITY: the entire multi-table save (product core + translations + gallery +
+  // tiers) runs as ONE Postgres transaction via the admin_save_product() RPC (migration 0022).
+  // Any failure inside rolls the WHOLE operation back — an admin Save either commits every
+  // requested change or none. The RPC is SECURITY DEFINER but verifies public.is_admin() and has
+  // a locked search_path, so it never widens the caller's privileges. Every DB error is surfaced.
+  const productPayload = {
     is_active: input.isActive, sort_order: input.sortOrder,
     base_price_cents: input.basePriceCents, min_qty: input.minQty, qty_step: input.qtyStep, max_qty: input.maxQty,
     compare_at_cents: input.compareAtCents, promo_enabled: input.promoEnabled,
     promo_start: input.promoStart, promo_end: input.promoEnd,
     cover_media_id: input.coverId, video_media_id: input.videoId, poster_media_id: input.posterId,
-  }).eq('id', productId);
-  if (upd.error) return { ok: false, message: upd.error.message };
-
-  const trRows = locales.map(l => ({
-    product_id: productId, locale: l,
+  };
+  const translationsPayload = locales.map(l => ({
+    locale: l,
     name: input.tr[l].name, slug: input.tr[l].slug, h1: input.tr[l].h1,
     short_desc: input.tr[l].shortDesc, long_desc: input.tr[l].longDesc,
     features: input.tr[l].features, use_case: input.tr[l].useCase,
@@ -146,27 +161,27 @@ export async function saveProduct(input: ProductSaveInput): Promise<SaveResult> 
     moq_text: input.tr[l].moqText, badge: input.tr[l].badge, promo_badge: input.tr[l].promoBadge,
     seo_title: input.tr[l].seoTitle, seo_description: input.tr[l].seoDescription,
   }));
-  const trUp = await sb.from('product_translations').upsert(trRows, { onConflict: 'product_id,locale' });
-  if (trUp.error) return { ok: false, message: trUp.error.message };
+  const tiersPayload = cleanTiers.map((t, i) => ({
+    min_qty: t.minQty, unit_price_cents: t.ratePer1000Cents,
+    badge_de: t.badgeDe || null, badge_en: t.badgeEn || null, badge_fr: t.badgeFr || null,
+    is_active: t.isActive, sort_order: i,
+  }));
 
-  await sb.from('product_media').delete().eq('product_id', productId).eq('role', 'gallery');
-  if (input.galleryIds.length) {
-    const rows = input.galleryIds.map((mid, i) => ({ product_id: productId, media_id: mid, role: 'gallery', sort_order: i }));
-    const gi = await sb.from('product_media').insert(rows);
-    if (gi.error) return { ok: false, message: gi.error.message };
-  }
-
-  // Staffelpreise: validate then replace the product's tier set.
-  const validTiers = (input.tiers ?? []).filter(t => Number.isInteger(t.minQty) && t.minQty > 0 && Number.isInteger(t.ratePer1000Cents) && t.ratePer1000Cents >= 0);
-  if (validTiers.length) {
-    await sb.from('product_price_tiers').delete().eq('product_id', productId);
-    const rows = [...validTiers].sort((a,b)=>a.minQty-b.minQty).map((t, i) => ({
-      product_id: productId, min_qty: t.minQty, unit_price_cents: t.ratePer1000Cents,
-      badge_de: t.badgeDe || null, badge_en: t.badgeEn || null, badge_fr: t.badgeFr || null,
-      is_active: t.isActive, sort_order: i,
-    }));
-    const ti = await sb.from('product_price_tiers').insert(rows);
-    if (ti.error) return { ok: false, message: ti.error.message };
+  const { error: rpcErr } = await sb.rpc('admin_save_product', {
+    p_product_code: input.productCode,
+    p_product: productPayload,
+    p_translations: translationsPayload,
+    p_gallery_ids: input.galleryIds,
+    p_tiers: tiersPayload,
+  });
+  if (rpcErr) {
+    // Map the two domain raises to friendly Turkish; surface anything else verbatim.
+    const msg = rpcErr.message || 'Kayıt başarısız.';
+    if (/product_not_found/.test(msg)) return { ok: false, message: `Ürün bulunamadı: ${input.productCode}` };
+    if (/not_admin/.test(msg)) return { ok: false, message: 'Yetkisiz.' };
+    if (/no_active_tier_covers_min_qty/.test(msg)) return { ok: false, message: 'Ürünün minimum adedi için aktif bir fiyat kademesi tanımlanmalıdır.' };
+    if (/invalid_qty_rules/.test(msg)) return { ok: false, message: 'Adet kuralları 1.000 ile 100.000 arasında, 1.000’in katı ve (maks − min) ÷ adım tam sayı olmalıdır.' };
+    return { ok: false, message: msg };
   }
 
   for (const l of locales) {
