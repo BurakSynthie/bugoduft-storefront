@@ -15,6 +15,7 @@ import { createBugoDraftOrder, deleteDraftOrder, type DraftOrderAttr } from '@/l
 import { recordOrphanDraft } from '@/repositories/reconciliation';
 import { orphanCleanupOutcome, createCertaintyDecision } from '@/lib/checkout/guards';
 import { formatQty } from '@/lib/money';
+import { getCheckoutAttribution, checkoutAttributionAttributes } from '@/lib/analytics/server-attribution';
 
 const ERR_PREP = 'Die Konfiguration konnte nicht für den Checkout vorbereitet werden. Bitte versuchen Sie es erneut.';
 const ERR_IN_PROGRESS = 'Für diese Konfiguration läuft bereits ein Checkout. Bitte einen Moment warten und erneut versuchen.';
@@ -168,8 +169,11 @@ export async function finalizeCheckout(
     return { ok:false, code:'error', message: ERR_IN_PROGRESS };
   }
 
+  const attribution = await getCheckoutAttribution();
+
   const attributes: DraftOrderAttr[] = [
     { key:'BUGO Configuration ID', value: cfg.configId },
+    ...checkoutAttributionAttributes(attribution),
     { key:'Kollektion', value: cfg.collectionCode },
     { key:'Menge', value: `${formatQty(cfg.quantity, cfg.locale)}` },
     { key:'Duft', value: cfg.scentCode ?? '-' },

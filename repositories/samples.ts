@@ -12,6 +12,7 @@ import { getSettingsAuthoritative } from '@/repositories/settings';
 import { beginCheckoutIntent, resolveCheckoutIntent, getOrCreateSampleOrder, setSampleInvoice,
   attachIntentDraftUrl, getIntentInvoiceUrl } from '@/repositories/configurations';
 import { SAMPLE_PRICE_CENTS, SAMPLE_CREDIT_CENTS } from '@/lib/sample/constants';
+import { getCheckoutAttribution, checkoutAttributionAttributes } from '@/lib/analytics/server-attribution';
 
 // Completion pass §1: the standalone, separately purchasable "Duftmuster-Set" (40
 // fragrances, €40). Real commerce — no configurator, no 1,000+ main-product order
@@ -117,8 +118,11 @@ export async function beginSampleCheckout(locale: Locale, checkoutAttemptId: str
     return { ok:false, code:'error', message:'Für diese Anfrage läuft bereits ein Checkout. Bitte einen Moment warten und erneut versuchen.' };
   }
 
+  const attribution = await getCheckoutAttribution();
+
   const attributes: DraftOrderAttr[] = [
     { key:'BUGO Sample Order ID', value: sampleOrderId },
+    ...checkoutAttributionAttributes(attribution),
     { key:'Produkt', value: 'Duftmuster-Set (40 Düfte)' },
     { key:'Gesamtpreis (BUGO)', value: `${(effPriceCents/100).toFixed(2)} €` },
   ];

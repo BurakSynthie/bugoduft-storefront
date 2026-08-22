@@ -7,6 +7,7 @@ import { verifyMoney, parseMoneyToCents } from '@/lib/checkout/money';
 import { resolveEventAt } from '@/lib/checkout/event-time';
 import { classifyOrigin } from '@/lib/checkout/origin';
 import { buildOrderSnapshot } from '@/lib/checkout/order-snapshot';
+import { sendServerPurchase } from '@/lib/analytics/server-purchase';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -302,6 +303,17 @@ export async function POST(req: NextRequest) {
         if (!(await setStatus('reconciled'))) return NextResponse.json({ error: 'status_persist_failed' }, { status: 500 });
         return NextResponse.json({ ok: true, kind: 'sample', reconciled: sampleMismatch.reason });
       }
+      // Server-side Purchase only after the authoritative paid event won.
+      // Mismatch already returned above; stale/cancelled events never emit Purchase.
+      if (isPaid && !isCancelled && !sampleStale) {
+        await sendServerPurchase({
+          order,
+          shopifyOrderId,
+          eventAt,
+          kind: 'sample',
+        });
+      }
+
       if (!(await setStatus('completed'))) return NextResponse.json({ error: 'status_persist_failed' }, { status: 500 });
       return NextResponse.json({ ok: true, kind: 'sample', stale: sampleStale });
     }
@@ -441,6 +453,16 @@ export async function POST(req: NextRequest) {
     if (mainMismatch) {
       if (!(await setStatus('reconciled'))) return NextResponse.json({ error: 'status_persist_failed' }, { status: 500 });
       return NextResponse.json({ ok: true, kind: 'main', reconciled: mainMismatch.reason });
+    }
+
+    // Server-side Purchase only for an authoritative, non-stale, amount-verified paid event.
+    if (applyPaid) {
+      await sendServerPurchase({
+        order,
+        shopifyOrderId,
+        eventAt,
+        kind: 'main',
+      });
     }
 
     if (!(await setStatus('completed'))) return NextResponse.json({ error: 'status_persist_failed' }, { status: 500 });
