@@ -1,5 +1,13 @@
 import 'server-only';
 import { adminGraphql, isAdminConfigured, ShopifyAdminError } from '@/config/shopify-admin';
+// §v1.2.5-final The PURE DraftOrderInput builder lives in a server-agnostic module so a
+// standalone tsx/Node test can import it without loading this `server-only` module. Runtime
+// behavior is unchanged: createBugoDraftOrder still calls buildBugoDraftOrderInput verbatim.
+import { buildBugoDraftOrderInput, type CreateBugoDraftOrderArgs } from './draft-order-input';
+// Re-export the pure builder and its public types so existing importers of THIS module keep
+// working exactly as in v1.2.5 (e.g. `import { ..., type DraftOrderAttr } from '@/lib/shopify/draft-order'`).
+export { buildBugoDraftOrderInput, CHECKOUT_DEFAULT_COUNTRY } from './draft-order-input';
+export type { DraftOrderAttr, CreateBugoDraftOrderArgs } from './draft-order-input';
 
 // ============================================================================
 // P0 (final hardening §P0-1 / §P0-2): charge the EXACT BUGO authoritative total.
@@ -34,7 +42,6 @@ import { adminGraphql, isAdminConfigured, ShopifyAdminError } from '@/config/sho
 //   No "taxes-included" store setting is required — taxExempt makes the point moot.
 // ============================================================================
 
-export type DraftOrderAttr = { key: string; value: string };
 // §P0-1 When a created draft fails the amount/currency guard, its deletion is a
 // PAYMENT-SAFETY-CRITICAL invalidation (not best-effort). `cleanup` reports whether that
 // deletion was CONFIRMED. `orphanDraftId` is set ONLY when deletion was attempted but NOT
@@ -100,11 +107,7 @@ export async function deleteDraftOrder(id: string): Promise<boolean> {
   } catch { return false; }
 }
 
-export async function createBugoDraftOrder(args: {
-  configId: string; collectionCode?: string; title: string; quantity: number;
-  totalPriceCents: number; currency?: 'EUR'; note?: string; attributes: DraftOrderAttr[];
-  customerEmail?: string | null;
-}): Promise<DraftOrderResult> {
+export async function createBugoDraftOrder(args: CreateBugoDraftOrderArgs): Promise<DraftOrderResult> {
   if (!isAdminConfigured()) {
     return { ok: false, reason: 'unconfigured', certainty: 'definitely_no_draft',
       message: 'Der Shopify-Draft-Order-Checkout ist noch nicht konfiguriert (Admin API fehlt).' };
@@ -114,35 +117,7 @@ export async function createBugoDraftOrder(args: {
     return { ok: false, reason: 'error', certainty: 'definitely_no_draft', message: 'Ungültiger Gesamtbetrag.' };
   }
   const currencyCode = (args.currency ?? 'EUR');
-  const amount = (args.totalPriceCents / 100).toFixed(2);
-
-  // Custom line item: NO variantId. On API 2026-07 the scalar `originalUnitPrice` is
-  // deprecated in favour of `originalUnitPriceWithCurrency` (a MoneyInput). We set the
-  // amount AND an explicit currency so the price is never reinterpreted in a different
-  // presentment currency. No variant is attached, so no catalog price overrides it.
-  const lineItem: Record<string, unknown> = {
-    title: args.title,
-    quantity: 1,                        // one configured BUGO production order = 1 line
-    originalUnitPriceWithCurrency: { amount, currencyCode },
-    requiresShipping: true,
-    taxable: false,                     // tax handled at order level (taxExempt) — never added on top
-    customAttributes: args.attributes.map(a => ({ key: a.key, value: a.value })),
-  };
-
-  const input: Record<string, unknown> = {
-    lineItems: [lineItem],
-    // Force EUR as the draft's presentment currency so read-back and the customer's
-    // invoice are both in EUR — never a converted amount in another currency.
-    presentmentCurrencyCode: currencyCode,
-    tags: args.collectionCode ? ['bugo-configurator', args.collectionCode] : ['bugo-sample'],
-    note: args.note ?? `BUGO Configuration ${args.configId}`,
-    useCustomerDefaultAddress: false,
-    taxExempt: true,                    // §P0-2: Shopify adds no tax on top of the BUGO total
-    // §P0-2: fixed custom shipping at 0,00 so no calculated shipping is added at checkout.
-    // Uses the current MoneyInput field (the scalar `price` is deprecated on 2026-07).
-    shippingLine: { title: 'BUGO', priceWithCurrency: { amount: '0.00', currencyCode } },
-  };
-  if (args.customerEmail) input.email = args.customerEmail;
+  const input = buildBugoDraftOrderInput(args);
 
   try {
     const data = await adminGraphql<DraftOrderCreateResponse>(DRAFT_ORDER_CREATE, { input });
