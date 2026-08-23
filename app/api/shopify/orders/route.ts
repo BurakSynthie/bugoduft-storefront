@@ -124,7 +124,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const ship = order.shipping_address ?? {}; const bill = order.billing_address ?? {};
-    const rawConfigId = attr(order, 'BUGO Configuration ID');
+    // §hide-internal Configuration ID is now attached under the HIDDEN key
+    // '_BUGO Configuration ID' (underscore = hidden from customer checkout). Read the new key
+    // first, fall back to the legacy un-prefixed key so orders created before this change still
+    // resolve. Same value either way — order↔configuration linkage is unchanged.
+    const rawConfigId = attr(order, '_BUGO Configuration ID') ?? attr(order, 'BUGO Configuration ID');
     const rawSampleOrderId = attr(order, 'BUGO Sample Order ID');
 
     // §OPTION-2 ORIGIN CLASSIFICATION before any BUGO commerce mutation. classifyOrigin normalizes

@@ -547,6 +547,8 @@ body.overlay-open{overflow:hidden}
 /* Phase 6A: product detail cover + gallery (fallback-safe) */
 .pdp__visual{position:relative;overflow:hidden}
 .pdp__cover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.pdp__visual[data-c="STANDARD"] .pdp__cover,
+.pdp__visual[data-c="PREMIUM"] .pdp__cover{object-fit:contain;object-position:center}
 .pdp__gallery{display:flex;gap:.5rem;margin-top:var(--s-3);overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
 .pdp__thumb{flex:0 0 22%;min-width:72px;aspect-ratio:1;object-fit:cover;border-radius:10px;scroll-snap-align:start;border:1px solid var(--border)}
 .pdp__gallery button.pdp__thumb{padding:0;cursor:pointer;background:none;overflow:hidden;display:block}
@@ -554,6 +556,8 @@ body.overlay-open{overflow:hidden}
 .pdp__gallery button.pdp__thumb.is-active{border:2px solid var(--accent)}
 .pdp__gallery button.pdp__thumb:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .pdp__visual video.pdp__cover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.pdp__visual[data-c="STANDARD"] video.pdp__cover,
+.pdp__visual[data-c="PREMIUM"] video.pdp__cover{object-fit:contain;object-position:center}
 
 /* Phase 6C: promo compare price + product detail info blocks */
 .price-compare{color:var(--fg-muted);text-decoration:line-through;font-size:.95rem;opacity:.8}

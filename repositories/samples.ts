@@ -173,6 +173,8 @@ export async function beginSampleCheckout(locale: Locale, checkoutAttemptId: str
     configId: sampleOrderId, title: TITLE[locale], quantity: 1,
     totalPriceCents: effPriceCents, attributes, customerEmail: user?.email ?? null,
     note: `BUGO Duftmuster-Set — sample_orders.id=${sampleOrderId}`,
+    // §checkout-locale sample checkout also opens in the storefront language.
+    locale,
   });
   if (!draft.ok) {
     // §OPTION-3-v4 #4 CREATE-CERTAINTY decision (same policy as main). unknown_create_outcome →

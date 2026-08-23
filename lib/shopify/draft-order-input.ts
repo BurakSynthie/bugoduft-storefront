@@ -19,7 +19,34 @@ export type CreateBugoDraftOrderArgs = {
   configId: string; collectionCode?: string; title: string; quantity: number;
   totalPriceCents: number; currency?: 'EUR'; note?: string; attributes: DraftOrderAttr[];
   customerEmail?: string | null;
+  // §checkout-locale The active BUGO storefront locale (de/en/fr). Optional so existing callers /
+  // tests are unaffected; when present it is appended to the Shopify invoice URL (see
+  // withCheckoutLocale) so the Shopify-hosted checkout OPENS in the same language the customer was
+  // browsing. It does NOT enter the DraftOrderInput — pricing, currency, market and country are
+  // untouched; only the checkout UI language follows the storefront.
+  locale?: string | null;
 };
+
+// §checkout-locale Shopify's hosted checkout honours a `locale` query parameter on the checkout
+// URL (the invoice URL redirects to checkout carrying its query string). This PURE helper appends
+// `?locale=<locale>` (or `&locale=` when the URL already has a query) to the draft-order invoice
+// URL so the checkout renders in the storefront language. It is defensive: an empty/unknown locale
+// or an unparseable URL is returned unchanged (never breaks the redirect). The language must also
+// be published in Shopify Admin → Settings → Languages for the translation to take effect; if it
+// is not, Shopify falls back to the store's default language (it does not error).
+export function withCheckoutLocale(invoiceUrl: string, locale?: string | null): string {
+  if (!invoiceUrl || !locale) return invoiceUrl;
+  const lang = String(locale).trim().toLowerCase();
+  if (!/^[a-z]{2}(-[a-z]{2})?$/.test(lang)) return invoiceUrl;   // only well-formed locale codes
+  try {
+    const u = new URL(invoiceUrl);
+    if (u.searchParams.has('locale')) return invoiceUrl;         // never override an explicit locale
+    u.searchParams.set('locale', lang);
+    return u.toString();
+  } catch {
+    return invoiceUrl;   // non-absolute / unparseable → leave the URL exactly as Shopify returned it
+  }
+}
 
 // §v1.2.5 GERMANY-FIRST CHECKOUT. BUGO DUFT.DE is a Germany-first storefront, so a freshly
 // created Shopify invoice checkout must OPEN with Land/Region = Deutschland instead of

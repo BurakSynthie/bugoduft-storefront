@@ -6,7 +6,8 @@ import { adminGraphql, isAdminConfigured, ShopifyAdminError } from '@/config/sho
 import { buildBugoDraftOrderInput, type CreateBugoDraftOrderArgs } from './draft-order-input';
 // Re-export the pure builder and its public types so existing importers of THIS module keep
 // working exactly as in v1.2.5 (e.g. `import { ..., type DraftOrderAttr } from '@/lib/shopify/draft-order'`).
-export { buildBugoDraftOrderInput, CHECKOUT_DEFAULT_COUNTRY } from './draft-order-input';
+export { buildBugoDraftOrderInput, CHECKOUT_DEFAULT_COUNTRY, withCheckoutLocale } from './draft-order-input';
+import { withCheckoutLocale } from './draft-order-input';
 export type { DraftOrderAttr, CreateBugoDraftOrderArgs } from './draft-order-input';
 
 // ============================================================================
@@ -149,7 +150,9 @@ export async function createBugoDraftOrder(args: CreateBugoDraftOrderArgs): Prom
         cleanup: { attempted: true, confirmed: deleted, orphanDraftId: deleted ? undefined : draft.id } };
     }
 
-    return { ok: true, invoiceUrl: draft.invoiceUrl, draftOrderId: draft.id, name: draft.name };
+    // §checkout-locale open the Shopify-hosted checkout in the active storefront language by
+    // appending ?locale=<de|en|fr> to the invoice URL. No-op when no locale was supplied.
+    return { ok: true, invoiceUrl: withCheckoutLocale(draft.invoiceUrl, args.locale), draftOrderId: draft.id, name: draft.name };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     // §OPTION-3-v4 #4 a failure BEFORE request dispatch proves no draft; a failure AFTER dispatch

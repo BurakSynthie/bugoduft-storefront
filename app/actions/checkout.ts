@@ -172,7 +172,10 @@ export async function finalizeCheckout(
   const attribution = await getCheckoutAttribution();
 
   const attributes: DraftOrderAttr[] = [
-    { key:'BUGO Configuration ID', value: cfg.configId },
+    // §hide-internal technical linkage id — hidden from the customer via underscore prefix,
+    // still on the order + Admin API + webhook. Reader: app/api/shopify/orders/route.ts
+    // (reads '_BUGO Configuration ID' first, falls back to legacy 'BUGO Configuration ID').
+    { key:'_BUGO Configuration ID', value: cfg.configId },
     ...checkoutAttributionAttributes(attribution),
     { key:'Kollektion', value: cfg.collectionCode },
     { key:'Menge', value: `${formatQty(cfg.quantity, cfg.locale)}` },
@@ -280,6 +283,8 @@ export async function finalizeCheckout(
     configId: cfg.configId, collectionCode: cfg.collectionCode,
     title: `BUGO ${cfg.collectionCode} — ${formatQty(cfg.quantity, cfg.locale)} Stück`,
     quantity: cfg.quantity, totalPriceCents: finalTotalCents, attributes,
+    // §checkout-locale open Shopify checkout in the storefront language the customer was using.
+    locale: cfg.locale,
   });
   if (!draft.ok) {
     // §OPTION-3-v4 #4 CREATE-CERTAINTY decision. A timeout/abort/HTTP-5xx after the request was

@@ -46,11 +46,18 @@ export async function getCheckoutAttribution(): Promise<CheckoutAttribution> {
 }
 
 export function checkoutAttributionAttributes(a: CheckoutAttribution) {
+  // §hide-internal These are INTERNAL attribution/consent values consumed by the server-side
+  // Purchase pipeline (lib/analytics/server-purchase.ts → GA4 Measurement Protocol + Meta CAPI).
+  // Underscore-prefixed line-item property keys are hidden by Shopify's customer-facing surfaces
+  // (cart, checkout, order-confirmation email) but REMAIN on the order and readable via the Admin
+  // API / order webhook — so GA4/CAPI/Purchase attribution keep working unchanged. The readers in
+  // server-purchase.ts match BOTH the new '_BUGO …' keys and the legacy 'BUGO …' keys, so orders
+  // created before this change still attribute correctly.
   return [
-    { key: 'BUGO Analytics Consent', value: a.analyticsConsent ? '1' : '0' },
-    { key: 'BUGO Marketing Consent', value: a.marketingConsent ? '1' : '0' },
-    ...(a.gaClientId ? [{ key: 'BUGO GA Client ID', value: a.gaClientId }] : []),
-    ...(a.metaFbp ? [{ key: 'BUGO Meta FBP', value: a.metaFbp }] : []),
-    ...(a.metaFbc ? [{ key: 'BUGO Meta FBC', value: a.metaFbc }] : []),
+    { key: '_BUGO Analytics Consent', value: a.analyticsConsent ? '1' : '0' },
+    { key: '_BUGO Marketing Consent', value: a.marketingConsent ? '1' : '0' },
+    ...(a.gaClientId ? [{ key: '_BUGO GA Client ID', value: a.gaClientId }] : []),
+    ...(a.metaFbp ? [{ key: '_BUGO Meta FBP', value: a.metaFbp }] : []),
+    ...(a.metaFbc ? [{ key: '_BUGO Meta FBC', value: a.metaFbc }] : []),
   ];
 }

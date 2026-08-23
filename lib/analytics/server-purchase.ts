@@ -18,17 +18,22 @@ type PurchaseItem = {
   quantity: number;
 };
 
-function attr(order: any, key: string): string | null {
+function attr(order: any, ...keys: string[]): string | null {
+  // §hide-internal accepts one or more candidate property names and returns the first that
+  // resolves. Callers pass the NEW private key first and the LEGACY key second, so hidden
+  // (underscore-prefixed) properties on new orders AND un-prefixed properties on pre-change
+  // orders both attribute correctly. Behaviour for a single key is unchanged.
   const list =
     order?.line_items?.flatMap((li: any) => li?.properties ?? []) ?? [];
 
-  const found = list.find((p: any) => p?.name === key);
-  const value = found?.value;
-
-  if (value == null) return null;
-
-  const cleaned = String(value).trim();
-  return cleaned || null;
+  for (const key of keys) {
+    const found = list.find((p: any) => p?.name === key);
+    const value = found?.value;
+    if (value == null) continue;
+    const cleaned = String(value).trim();
+    if (cleaned) return cleaned;
+  }
+  return null;
 }
 
 function money(value: unknown): number | null {
@@ -152,9 +157,9 @@ async function sendGa4(input: {
   value: number;
   items: PurchaseItem[];
 }) {
-  if (attr(input.order, 'BUGO Analytics Consent') !== '1') return;
+  if (attr(input.order, '_BUGO Analytics Consent', 'BUGO Analytics Consent') !== '1') return;
 
-  const clientId = attr(input.order, 'BUGO GA Client ID');
+  const clientId = attr(input.order, '_BUGO GA Client ID', 'BUGO GA Client ID');
   const measurementId = process.env.GA4_MEASUREMENT_ID?.trim();
   const apiSecret = process.env.GA4_API_SECRET?.trim();
 
@@ -210,7 +215,7 @@ async function sendMeta(input: {
   value: number;
   items: PurchaseItem[];
 }) {
-  if (attr(input.order, 'BUGO Marketing Consent') !== '1') return;
+  if (attr(input.order, '_BUGO Marketing Consent', 'BUGO Marketing Consent') !== '1') return;
 
   const pixelId = process.env.META_PIXEL_ID?.trim();
   const accessToken = process.env.META_CAPI_ACCESS_TOKEN?.trim();
@@ -219,8 +224,8 @@ async function sendMeta(input: {
 
   const email = normalizedEmail(input.order);
   const phone = normalizedPhone(input.order);
-  const fbp = attr(input.order, 'BUGO Meta FBP');
-  const fbc = attr(input.order, 'BUGO Meta FBC');
+  const fbp = attr(input.order, '_BUGO Meta FBP', 'BUGO Meta FBP');
+  const fbc = attr(input.order, '_BUGO Meta FBC', 'BUGO Meta FBC');
 
   const userData: Record<string, unknown> = {};
 

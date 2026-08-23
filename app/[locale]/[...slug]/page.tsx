@@ -236,11 +236,19 @@ export default async function CatchAll({ params, searchParams }: { params: Promi
               <Link href={`/${locale}`}>Home</Link> / <Link href={sectionPath('products', locale)}>{dict.nav.products}</Link> / <span>{p.name}</span>
             </nav>
             <div className="hero__grid">
-              <div>
+              {/* §mobile-fix: both hero__grid children need min-width:0 so the single-column
+                  mobile track can shrink to the viewport. Grid/flex items default to
+                  min-width:auto, which here pinned the column to the gallery block's ~392px
+                  min-content and pushed the H1, price, Staffelpreise card and image off the
+                  right edge on phones. The homepage hero already sets this on .hero__intro/
+                  .hero__details; the product detail reused .hero__grid with plain divs that
+                  never got it. Scoped to this page only — desktop (≥960px, fr columns) is
+                  unaffected. */}
+              <div style={{ minWidth: 0 }}>
                 <span className="eyebrow">{p.collectionCode}</span>
                 {p.badge && <Badge accent>{p.badge}</Badge>}
                 {p.promoActive && p.promoBadge && <Badge accent>{p.promoBadge}</Badge>}
-                <h1 style={{ fontSize:'var(--t-h2)', marginTop:'var(--s-3)' }}>{p.h1}</h1>
+                <h1 style={{ fontSize:'var(--t-h2)', marginTop:'var(--s-3)', overflowWrap:'anywhere' }}>{p.h1}</h1>
                 <p className="lede">{p.shortDesc || p.longDesc}</p>
                 <div style={{ margin:'var(--s-6) 0', display:'flex', alignItems:'baseline', gap:'var(--s-3)', flexWrap:'wrap' }}>
                   <Price cents={p.priceFromCents} currency={p.currency} locale={locale} from={dict.common.from} />
@@ -251,10 +259,14 @@ export default async function CatchAll({ params, searchParams }: { params: Promi
                 <div className="card" style={{ padding:'var(--s-5)', marginBottom:'var(--s-5)' }}>
                   <strong style={{ fontSize:'.9rem' }}>{locale==='de'?'Staffelpreise':locale==='en'?'Volume pricing':'Tarifs dégressifs'}</strong>
                   <div style={{ marginTop:'var(--s-3)', display:'grid', gap:'.4rem' }}>
+                    {/* §mobile-fix: robust 2-col grid instead of flex space-between. minmax(0,1fr)
+                        lets the quantity label shrink/wrap while `auto` keeps the price column at its
+                        content width; the price stays nowrap + right-aligned so the € can never leave
+                        the viewport (even "ab 100.000 Stück · 209,00 €" fits at 320px). */}
                     {p.tiers.map(t => (
-                      <div key={t.minQty} style={{ display:'flex', justifyContent:'space-between', fontSize:'.92rem' }}>
-                        <span className="muted">{locale==='de'?'ab':locale==='en'?'from':'dès'} {new Intl.NumberFormat(locale==='de'?'de-DE':locale==='en'?'en-IE':'fr-FR').format(t.minQty)} {locale==='fr'?'pièces':'Stück'}</span>
-                        <span className="price">{formatMoney(t.unitPriceCents, p.currency, locale)}</span>
+                      <div key={t.minQty} style={{ display:'grid', gridTemplateColumns:'minmax(0,1fr) auto', gap:'var(--s-3)', alignItems:'baseline', fontSize:'.92rem' }}>
+                        <span className="muted" style={{ minWidth:0 }}>{locale==='de'?'ab':locale==='en'?'from':'dès'} {new Intl.NumberFormat(locale==='de'?'de-DE':locale==='en'?'en-IE':'fr-FR').format(t.minQty)} {locale==='fr'?'pièces':'Stück'}</span>
+                        <span className="price" style={{ whiteSpace:'nowrap', textAlign:'right' }}>{formatMoney(t.unitPriceCents, p.currency, locale)}</span>
                       </div>
                     ))}
                   </div>
@@ -273,7 +285,7 @@ export default async function CatchAll({ params, searchParams }: { params: Promi
                 </ul>
               </div>
               {/* sticky product visual (~45% col): interactive gallery — thumbs switch main */}
-              <div style={{ position:'sticky', top:'88px', alignSelf:'start' }}>
+              <div style={{ position:'sticky', top:'88px', alignSelf:'start', minWidth: 0 }}>
                 <ProductGallery cover={p.coverImage ?? null} coverAlt={p.coverAlt ?? null}
                   gallery={p.gallery} galleryAlt={p.galleryAlt} collectionCode={p.collectionCode} name={p.name} />
                 <div className="chips" style={{ marginTop:'var(--s-4)' }}>
