@@ -24,6 +24,18 @@ export type SeoPageKey =
 // stay stable (data-driven from the seed); only the visible copy + page SEO are editable.
 export type IndustryContent = { h1: L10n; body: L10n; seoTitle: L10n; seoDescription: L10n };
 
+export type CustomIndustry = {
+  id: string;
+  active: boolean;
+  name: L10n;
+  slug: L10n;
+  h1: L10n;
+  body: L10n;
+  seoTitle: L10n;
+  seoDescription: L10n;
+  ogImage: string | null;
+};
+
 export type BrandMedia = {
   logo: string | null;            // main header/footer logo (optional; text brand is fallback)
   favicon: string | null;         // admin-selected favicon (falls back to /favicon.svg)
@@ -102,6 +114,7 @@ export type SiteSettings = {
   };
   // §K editable industry page content (Autohaus + Werkstatt). Routes stay stable.
   industryContent: { autohaus: IndustryContent; werkstatt: IndustryContent };
+  customIndustries: CustomIndustry[];
 };
 
 const emptyL10n = (): L10n => Object.fromEntries(locales.map(l => [l, ''])) as L10n;
@@ -144,6 +157,20 @@ function emptyIndustryContent(): IndustryContent {
   return { h1: emptyL10n(), body: emptyL10n(), seoTitle: emptyL10n(), seoDescription: emptyL10n() };
 }
 
+function mergeCustomIndustry(o: Partial<CustomIndustry> | undefined): CustomIndustry {
+  return {
+    id: typeof o?.id === 'string' ? o.id : '',
+    active: o?.active !== false,
+    name: mergeL10n(emptyL10n(), o?.name),
+    slug: mergeL10n(emptyL10n(), o?.slug),
+    h1: mergeL10n(emptyL10n(), o?.h1),
+    body: mergeL10n(emptyL10n(), o?.body),
+    seoTitle: mergeL10n(emptyL10n(), o?.seoTitle),
+    seoDescription: mergeL10n(emptyL10n(), o?.seoDescription),
+    ogImage: o?.ogImage ?? null,
+  };
+}
+
 export function defaultSettings(): SiteSettings {
   return {
     announcement: { enabled: false, configured: false, text: emptyL10n(), linkLabel: emptyL10n(), href: '', hrefL10n: emptyL10n() },
@@ -170,6 +197,7 @@ export function defaultSettings(): SiteSettings {
     footer: { brandCopy: emptyL10n(), minOrderCopy: emptyL10n(), bottomStatement: emptyL10n() },
     seo: { home: { title: emptyL10n(), description: emptyL10n() }, pages: defaultSeoPages() },
     industryContent: { autohaus: emptyIndustryContent(), werkstatt: emptyIndustryContent() },
+    customIndustries: [],
   };
 }
 
@@ -241,6 +269,9 @@ export function mergeSettings(over: Partial<SiteSettings> | null | undefined): S
       autohaus: mergeIndustry(d.industryContent.autohaus, over.industryContent?.autohaus),
       werkstatt: mergeIndustry(d.industryContent.werkstatt, over.industryContent?.werkstatt),
     },
+    customIndustries: Array.isArray(over.customIndustries)
+      ? over.customIndustries.map(i => mergeCustomIndustry(i)).filter(i => i.id)
+      : [],
   };
 }
 

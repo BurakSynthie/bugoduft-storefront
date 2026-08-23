@@ -28,8 +28,17 @@ ok('layout passes brandLogo to Header', /brandLogo=\{settings\.brand\.logo\}/.te
 
 // ---------------- §2 industry overrides matched by STABLE key (not localized slug) ----------
 const slugPage = read('app/[locale]/[...slug]/page.tsx');
-ok('industry override matches i.key (not i.slug) — metadata + body', !/i\.slug === 'autohaeuser'/.test(slugPage) && /i\.key === 'autohaeuser'/.test(slugPage));
-ok('werkstatt override matches i.key', /i\.key === 'werkstaetten'/.test(slugPage));
+const industriesRepo = read('repositories/industries.ts');
+
+ok('industry override uses stable autohaeuser key in unified reader',
+  /key === 'autohaeuser'/.test(industriesRepo) &&
+  /return 'autohaus'/.test(industriesRepo) &&
+  /getIndustryBySlugRead/.test(slugPage));
+
+ok('industry override uses stable werkstaetten key in unified reader',
+  /key === 'werkstaetten'/.test(industriesRepo) &&
+  /return 'werkstatt'/.test(industriesRepo) &&
+  /getIndustryBySlugRead/.test(slugPage));
 
 // ---------------- §3 About/B2B SEO wired; Sample H1/intro wired; Home no fake H1/intro; Production managed -------
 const infoPage = read('app/[locale]/info/[slug]/page.tsx');

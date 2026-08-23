@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { type Locale } from '@/i18n/config';
 import type { SiteSettings, SeoPageKey, PageSeo, IndustryContent } from '@/lib/settings/model';
+import type { CustomIndustry } from '@/lib/settings/model';
 import type { MediaRecord } from '@/lib/media/types';
 import MediaPicker from '@/components/admin/MediaPicker';
 import { saveSeoSettingsAction } from './actions';
@@ -34,6 +35,7 @@ export default function SeoEditor({ initial, configured }:{ initial: SiteSetting
   const [save, setSave] = useState<Save>('idle');
   const [msg, setMsg] = useState<string | null>(null);
   const [pickOg, setPickOg] = useState<SeoPageKey | null>(null);
+  const [pickCustomOg, setPickCustomOg] = useState<string | null>(null);
 
   const setPage = (k: SeoPageKey, field: keyof PageSeo, l: Locale, val: string) =>
     setS(v => ({ ...v, seo: { ...v.seo, pages: { ...v.seo.pages, [k]: { ...v.seo.pages[k], [field]: { ...(v.seo.pages[k][field] as Record<Locale,string>), [l]: val } } } } }));
@@ -41,6 +43,45 @@ export default function SeoEditor({ initial, configured }:{ initial: SiteSetting
     setS(v => ({ ...v, seo: { ...v.seo, pages: { ...v.seo.pages, [k]: { ...v.seo.pages[k], ogImage: url } } } }));
   const setInd = (k: 'autohaus'|'werkstatt', field: keyof IndustryContent, l: Locale, val: string) =>
     setS(v => ({ ...v, industryContent: { ...v.industryContent, [k]: { ...v.industryContent[k], [field]: { ...v.industryContent[k][field], [l]: val } } } }));
+  type CustomTextField = 'name'|'slug'|'h1'|'body'|'seoTitle'|'seoDescription';
+
+  const setCustomField = (id: string, field: CustomTextField, l: Locale, val: string) =>
+    setS(v => ({ ...v, customIndustries: v.customIndustries.map(i =>
+      i.id === id
+        ? ({ ...i, [field]: { ...(i[field] as Record<Locale,string>), [l]: val } } as CustomIndustry)
+        : i
+    ) }));
+
+  const setCustomActive = (id: string, active: boolean) =>
+    setS(v => ({ ...v, customIndustries: v.customIndustries.map(i => i.id === id ? { ...i, active } : i) }));
+
+  const setCustomOg = (id: string, url: string | null) =>
+    setS(v => ({ ...v, customIndustries: v.customIndustries.map(i => i.id === id ? { ...i, ogImage: url } : i) }));
+
+  const addCustomIndustry = () => {
+    const blank = (): Record<Locale,string> => ({ de:'', en:'', fr:'' });
+    const id = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `industry-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    const item: CustomIndustry = {
+      id,
+      active: false,
+      name: blank(),
+      slug: blank(),
+      h1: blank(),
+      body: blank(),
+      seoTitle: blank(),
+      seoDescription: blank(),
+      ogImage: null,
+    };
+    setS(v => ({ ...v, customIndustries: [...v.customIndustries, item] }));
+  };
+
+  const removeCustomIndustry = (id: string) => {
+    if (!window.confirm('Bu sektoru silmek istediginizden emin misiniz?')) return;
+    setS(v => ({ ...v, customIndustries: v.customIndustries.filter(i => i.id !== id) }));
+    if (pickCustomOg === id) setPickCustomOg(null);
+  };
 
   async function onSave() {
     setSave('saving'); setMsg(null);
@@ -95,6 +136,70 @@ export default function SeoEditor({ initial, configured }:{ initial: SiteSetting
     );
   };
 
+  const customIndustryBlock = (i: CustomIndustry) => {
+    const label = i.name[tab] || i.name.de || 'Yeni sektor';
+    return (
+      <div className="adm-panel" key={`custom-industry-${i.id}`}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'1rem', flexWrap:'wrap', marginBottom:'var(--s-3)' }}>
+          <div>
+            <strong>{label}</strong>
+            <div className="muted" style={{ fontSize:'.8rem', marginTop:'.15rem' }}>
+              {i.active ? 'Yayinda' : 'Taslak / pasif'}
+            </div>
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:'.75rem', flexWrap:'wrap' }}>
+            <label style={{ display:'flex', alignItems:'center', gap:'.4rem', cursor:'pointer' }}>
+              <input type="checkbox" checked={i.active} onChange={e=>setCustomActive(i.id,e.target.checked)} />
+              <span>Aktif</span>
+            </label>
+            <button className="linkbtn" style={{ color:'#B42318' }} onClick={()=>removeCustomIndustry(i.id)}>Sil</button>
+          </div>
+        </div>
+
+        <div className="adm-note" style={{ marginBottom:'var(--s-4)' }}>
+          <span>ⓘ</span>
+          <span>Aktif bir sektor icin DE / EN / FR dillerinde ad, slug, H1 ve govde metni zorunludur. Slug yalnizca a-z, 0-9 ve tire kullanabilir.</span>
+        </div>
+
+        <div className="field">
+          <label>Sektor adi ({tab.toUpperCase()})</label>
+          <input className="input" value={i.name[tab]} onChange={e=>setCustomField(i.id,'name',tab,e.target.value)} />
+        </div>
+
+        <div className="field">
+          <label>Slug ({tab.toUpperCase()})</label>
+          <input className="input" value={i.slug[tab]} onChange={e=>setCustomField(i.id,'slug',tab,e.target.value.toLowerCase())} placeholder="ornek: oto-yikama" />
+        </div>
+
+        <div className="field">
+          <label>H1 ({tab.toUpperCase()})</label>
+          <input className="input" value={i.h1[tab]} onChange={e=>setCustomField(i.id,'h1',tab,e.target.value)} />
+        </div>
+
+        <div className="field">
+          <label>Gorunen govde / icerik ({tab.toUpperCase()})</label>
+          <textarea className="textarea" rows={4} value={i.body[tab]} onChange={e=>setCustomField(i.id,'body',tab,e.target.value)} />
+        </div>
+
+        <div className="field">
+          <label>SEO basligi ({tab.toUpperCase()})</label>
+          <input className="input" value={i.seoTitle[tab]} onChange={e=>setCustomField(i.id,'seoTitle',tab,e.target.value)} placeholder="Marka eki otomatik eklenir" />
+        </div>
+
+        <div className="field">
+          <label>Meta aciklama ({tab.toUpperCase()})</label>
+          <textarea className="textarea" rows={2} value={i.seoDescription[tab]} onChange={e=>setCustomField(i.id,'seoDescription',tab,e.target.value)} />
+        </div>
+
+        <div className="field">
+          <label>OG gorseli (istege bagli)</label>
+          {i.ogImage
+            ? <div className="media-slot"><img src={i.ogImage} alt="" /><div className="media-slot__act"><button className="linkbtn" onClick={()=>{ setPickOg(null); setPickCustomOg(i.id); }}>Degistir</button><button className="linkbtn" style={{color:'#B42318'}} onClick={()=>setCustomOg(i.id,null)}>Kaldir</button></div></div>
+            : <button className="adm-btn adm-btn--ghost" onClick={()=>{ setPickOg(null); setPickCustomOg(i.id); }}>Sec / Yukle</button>}
+        </div>
+      </div>
+    );
+  };
   return (
     <>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'.5rem', marginBottom:'var(--s-4)', flexWrap:'wrap' }}>
@@ -118,7 +223,23 @@ export default function SeoEditor({ initial, configured }:{ initial: SiteSetting
       {field('autohaus')}
       {field('werkstatt')}
 
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'1rem', flexWrap:'wrap', margin:'var(--s-6) 0 var(--s-3)' }}>
+        <div>
+          <h2 style={{ fontSize:'1.05rem', margin:0 }}>Ek sektor sayfalari</h2>
+          <p className="muted" style={{ margin:'.25rem 0 0', fontSize:'.82rem' }}>Yeni Branchen sayfalari DE / EN / FR olarak buradan olusturulur.</p>
+        </div>
+        <button className="adm-btn adm-btn--primary" onClick={addCustomIndustry}>+ Neue Branche</button>
+      </div>
+
+      {s.customIndustries.length === 0 &&
+        <div className="adm-note" style={{ marginBottom:'var(--s-4)' }}>
+          <span>ⓘ</span><span>Henuz ek sektor yok. Yeni bir sayfa olusturmak icin + Neue Branche butonunu kullanin.</span>
+        </div>}
+
+      {s.customIndustries.map(customIndustryBlock)}
+
       {pickOg && <MediaPicker type="image" onSelect={(m: MediaRecord)=>{ setPageOg(pickOg, m.url); setPickOg(null); }} onClose={()=>setPickOg(null)} />}
+      {pickCustomOg && <MediaPicker type="image" onSelect={(m: MediaRecord)=>{ setCustomOg(pickCustomOg, m.url); setPickCustomOg(null); }} onClose={()=>setPickCustomOg(null)} />}
     </>
   );
 }

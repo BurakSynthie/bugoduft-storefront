@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { getAdminUser } from '@/lib/supabase/admin-auth';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { type SiteSettings, mergeSettings } from '@/lib/settings/model';
+import { listIndustries as listSeedIndustries } from './catalog';
 
 // Storefront read: DB-first, safe fallback to defaults (never blank).
 export async function getSettings(): Promise<SiteSettings> {
@@ -107,12 +108,67 @@ export async function saveSettings(content: SiteSettings): Promise<SettingsSaveR
     paidSampleCreditEur: Math.round(creditCents / 100),    // = commerce.paidSample.creditCents
   };
 
+  // Dynamic industry pages are admin-managed content, but routes must remain safe.
+  // Validate IDs and locale slugs before persisting so one malformed admin payload
+  // cannot create duplicate or ambiguous public URLs.
+  const rawIndustries = Array.isArray(content.customIndustries) ? content.customIndustries.slice(0, 100) : [];
+  const customIndustries: SiteSettings['customIndustries'] = [];
+  const seenIds = new Set<string>();
+  const seenSlugs = Object.fromEntries(
+    locales.map(l => [l, new Set(listSeedIndustries(l).map(i => i.slug))])
+  ) as Record<(typeof locales)[number], Set<string>>;
+
+  const clean = (v: unknown, max: number) =>
+    typeof v === 'string' ? v.trim().slice(0, max) : '';
+  const slugRe = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+  for (const raw of rawIndustries) {
+    const id = clean(raw?.id, 80);
+    if (!id) return { ok: false, message: 'Sektor kimligi eksik.' };
+    if (seenIds.has(id)) return { ok: false, message: 'Ayni sektor kimligi birden fazla kez kullanilamaz.' };
+    seenIds.add(id);
+
+    const item: SiteSettings['customIndustries'][number] = {
+      id,
+      active: raw?.active !== false,
+      name: { de:'', en:'', fr:'' },
+      slug: { de:'', en:'', fr:'' },
+      h1: { de:'', en:'', fr:'' },
+      body: { de:'', en:'', fr:'' },
+      seoTitle: { de:'', en:'', fr:'' },
+      seoDescription: { de:'', en:'', fr:'' },
+      ogImage: clean(raw?.ogImage, 2048) || null,
+    };
+
+    for (const l of locales) {
+      item.name[l] = clean(raw?.name?.[l], 160);
+      item.slug[l] = clean(raw?.slug?.[l], 120).toLowerCase();
+      item.h1[l] = clean(raw?.h1?.[l], 220);
+      item.body[l] = clean(raw?.body?.[l], 5000);
+      item.seoTitle[l] = clean(raw?.seoTitle?.[l], 180);
+      item.seoDescription[l] = clean(raw?.seoDescription?.[l], 500);
+
+      if (item.active && (!item.name[l] || !item.slug[l] || !item.h1[l] || !item.body[l])) {
+        return { ok: false, message: `Aktif sektor icin ${l.toUpperCase()} ad, slug, H1 ve icerik zorunludur.` };
+      }
+      if (item.slug[l] && !slugRe.test(item.slug[l])) {
+        return { ok: false, message: `${l.toUpperCase()} slug yalnizca a-z, 0-9 ve tire icerebilir.` };
+      }
+      if (item.slug[l] && seenSlugs[l].has(item.slug[l])) {
+        return { ok: false, message: `${l.toUpperCase()} slug zaten kullaniliyor: ${item.slug[l]}` };
+      }
+      if (item.slug[l]) seenSlugs[l].add(item.slug[l]);
+    }
+
+    customIndustries.push(item);
+  }
   // Any explicit admin save makes the announcement section authoritative from now on —
   // `enabled: false` must then win over the shipped seed fallback (see layout.tsx).
-  const toSave: SiteSettings = { ...content, commerce, sample, businessFacts, announcement: { ...content.announcement, configured: true } };
+  const toSave: SiteSettings = { ...content, commerce, sample, businessFacts, customIndustries, announcement: { ...content.announcement, configured: true } };
   const { error } = await sb.from('site_settings')
     .upsert({ id: 'default', content: toSave, updated_by: admin.id, updated_at: new Date().toISOString() }, { onConflict: 'id' });
   if (error) return { ok: false, message: error.message };
-  for (const l of locales) revalidatePath(`/${l}`, 'layout');   // announcement/footer live in the layout
+  for (const l of locales) revalidatePath(`/${l}`, 'layout');
+  revalidatePath('/sitemap.xml');   // announcement/footer live in the layout
   return { ok: true };
 }

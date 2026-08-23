@@ -13,9 +13,28 @@ export default function SearchOverlay({ locale }: { locale: Locale }) {
   const t = sf(locale);
   const open = overlay === 'search';
   const [q, setQ] = useState('');
+  const [dynamicIndustries, setDynamicIndustries] = useState<SearchEntry[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
-  const index = useMemo(() => buildIndex(locale), [locale]);
+  const index = useMemo(() => [...buildIndex(locale), ...dynamicIndustries], [locale, dynamicIndustries]);
   const results = useMemo(() => runSearch(index, q), [index, q]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetch(`/api/search/industries?locale=${encodeURIComponent(locale)}`, {
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+      .then(r => r.ok ? r.json() : [])
+      .then((rows: SearchEntry[]) => {
+        setDynamicIndustries(Array.isArray(rows) ? rows : []);
+      })
+      .catch(err => {
+        if (err?.name !== 'AbortError') setDynamicIndustries([]);
+      });
+
+    return () => controller.abort();
+  }, [locale]);
 
   useEffect(() => {
     if (!open) return;

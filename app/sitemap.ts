@@ -1,8 +1,9 @@
 import type { MetadataRoute } from 'next';
 import { locales, type Locale } from '@/i18n/config';
 import { abs } from '@/config/site';
-import { listIndustries, industryAlternates, sectionAlternates, homeAlternates } from '@/repositories/catalog';
+import { sectionAlternates, homeAlternates } from '@/repositories/catalog';
 import { getProducts as getProductsRead, getProductAlternates } from '@/repositories/catalog.read';
+import { getIndustries, getIndustryAlternates } from '@/repositories/industries';
 import { getSettings } from '@/repositories/settings';
 import { listPublishedForSitemap } from '@/repositories/blog';
 import { blogIndexPath, blogArticlePath, blogIndexAlternates } from '@/lib/blog/types';
@@ -57,9 +58,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   } catch {}
 
-  // Industry details (content pages).
-  for (const i of listIndustries('de')) {
-    const alt = industryAlternates(i.groupId);
+  // Industry details (built-in + active admin-created pages).
+  for (const i of await getIndustries('de')) {
+    const alt = await getIndustryAlternates(i.groupId);
     for (const l of locales) out.push({ url: abs(alt[l]), changeFrequency:'monthly', priority:0.6, alternates: withAlt(alt) });
   }
 

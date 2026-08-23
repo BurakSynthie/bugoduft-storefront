@@ -8,8 +8,8 @@ import { getDict } from '@/i18n';
 import { seg, matchSection, sectionPath, itemPath, configuratorPath, type Section } from '@/lib/routing';
 import {
   listProducts, getProductBySlug, listCollections, listScents, scentCategories,
-  listIndustries, getIndustryBySlug,
-  productAlternates, industryAlternates, sectionAlternates,
+  listIndustries,
+  productAlternates, sectionAlternates,
 } from '@/repositories/catalog';
 import { buildMetadata, breadcrumbLd, productLd } from '@/lib/seo';
 import { abs } from '@/config/site';
@@ -25,6 +25,7 @@ import { PrintFileCheckSection } from '@/components/storefront/PrintFileCheckCta
 import { getSettings } from '@/repositories/settings';
 import { optionLabel } from '@/lib/i18n/product-options';
 import { getProductBySlug as getProductBySlugRead, getProducts as getProductsRead, getCollections as getCollectionsRead, getScents as getScentsRead, getProductAlternates } from '@/repositories/catalog.read';
+import { getIndustries, getIndustryBySlug as getIndustryBySlugRead, getIndustryAlternates } from '@/repositories/industries';
 
 const DETAILS: Record<string,string> = { de:'Details ansehen', en:'View details', fr:'Voir les détails' };
 type Params = { locale: string; slug: string[] };
@@ -75,16 +76,14 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
       ogImage: p.coverImage || settings.defaultOgImage || undefined, brand });
   }
   if (r.kind === 'industry') {
-    const i = getIndustryBySlug(locale, r.slug); if (!i) return {};
+    const i = await getIndustryBySlugRead(locale, r.slug); if (!i) return {};
     // §K/§3 SEO SINGLE SOURCE: prefer seo.pages.autohaus/werkstatt for SEO title/meta/OG.
     // Match by STABLE key (not localized slug) so EN/FR resolve overrides too.
-    const seoKey = i.key === 'autohaeuser' ? 'autohaus' : i.key === 'werkstaetten' ? 'werkstatt' : null;
-    const sp = seoKey ? pages[seoKey] : null;
     return buildMetadata({ locale, path: itemPath('industries', locale, i.slug),
-      title: (sp?.title[locale]) || i.seo.title,
-      description: (sp?.description[locale]) || i.seo.description,
-      alternates: industryAlternates(i.groupId), brand,
-      ogImage: sp?.ogImage || settings.defaultOgImage || undefined });
+      title: i.seo.title,
+      description: i.seo.description,
+      alternates: await getIndustryAlternates(i.groupId), brand,
+      ogImage: i.ogImage || settings.defaultOgImage || undefined });
   }
   if (r.kind === 'section-index' && r.section === 'configurator') {
     return { title: 'Konfigurator', robots: { index:false, follow:true } };
@@ -336,18 +335,15 @@ export default async function CatchAll({ params, searchParams }: { params: Promi
   }
 
   if (r.kind === 'industry') {
-    const i = getIndustryBySlug(locale, r!.slug); if (!i) notFound();
+    const i = await getIndustryBySlugRead(locale, r!.slug); if (!i) notFound();
     const crumbs = [ crumbHome, { name: dict.nav.industries, url: abs(sectionPath('industries', locale)) },
       { name: i.name, url: abs(itemPath('industries', locale, i.slug)) } ];
     // §K/§2 admin content overrides for the two launch-important industry pages (Autohaus,
     // Werkstatt). industryContent drives the VISIBLE H1/body only (SEO comes from seo.pages).
     // Match by STABLE key so EN (car-dealerships/workshops) and FR (concessionnaires/garages)
     // resolve the same override as DE (autohaeuser/werkstaetten).
-    const settings = await getSettings();
-    const ic = i.key === 'autohaeuser' ? settings.industryContent.autohaus
-      : i.key === 'werkstaetten' ? settings.industryContent.werkstatt : null;
-    const h1 = (ic?.h1[locale]) || i.headline;
-    const body = (ic?.body[locale]) || i.body;
+    const h1 = i.headline;
+    const body = i.body;
     return (
       <>
         <JsonLd data={breadcrumbLd(crumbs)} />
@@ -435,7 +431,7 @@ export default async function CatchAll({ params, searchParams }: { params: Promi
     );
   }
   // industries index
-  const items = listIndustries(locale);
+  const items = await getIndustries(locale);
   const iv = (await getSettings()).seo.pages.industries;
   return (
     <section className="section">
