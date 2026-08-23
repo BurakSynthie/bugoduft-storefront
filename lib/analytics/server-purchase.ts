@@ -215,11 +215,6 @@ async function sendMeta(input: {
   const pixelId = process.env.META_PIXEL_ID?.trim();
   const accessToken = process.env.META_CAPI_ACCESS_TOKEN?.trim();
 
-  console.log('[analytics] Meta config check', {
-    pixelConfigured: Boolean(pixelId),
-    tokenConfigured: Boolean(accessToken),
-  });
-
   if (!pixelId || !accessToken) return;
 
   const email = normalizedEmail(input.order);
