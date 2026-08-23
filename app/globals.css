@@ -1195,3 +1195,77 @@ body{max-width:100%;overflow-x:clip}
     font-size:.7rem;
   }
 }
+
+
+/* ===== Mobile storefront final polish ===== */
+
+@media(max-width:640px){
+
+  /* Inner pages: remove excessive empty space */
+  .section{
+    padding-block:2rem;
+  }
+
+  .section--tight{
+    padding-block:1.65rem;
+  }
+
+  .eyebrow{
+    font-size:.74rem;
+    letter-spacing:.13em;
+    gap:.5rem;
+  }
+
+  .eyebrow::before{
+    width:22px;
+  }
+
+  .lede{
+    margin-top:.8rem;
+    font-size:1rem;
+    line-height:1.55;
+  }
+
+  /*
+   * The mobile navigation is fixed.
+   * Always reserve enough real space below page content so cards,
+   * buttons and text never disappear underneath it.
+   */
+  main{
+    padding-bottom:calc(92px + var(--safe-bottom));
+  }
+}
+
+
+/* Mobile BUGO logo ? larger without increasing header height */
+@media(max-width:430px){
+
+  .header .logo{
+    flex:0 1 auto;
+    width:clamp(118px,34vw,138px);
+    min-width:0;
+    overflow:visible;
+  }
+
+  .header .logo__img{
+    display:block;
+    width:100%;
+    max-width:none;
+    height:auto;
+    max-height:44px;
+    object-fit:contain;
+    object-position:left center;
+    transform:scale(1.10);
+    transform-origin:left center;
+  }
+}
+
+@media(max-width:360px){
+  .header .logo{
+    width:116px;
+  }
+
+  .header .logo__img{
+    transform:scale(1.07);
+  }
+}
