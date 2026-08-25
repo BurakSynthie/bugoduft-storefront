@@ -3,7 +3,7 @@ const en = {
          production:'Production', references:'References', faq:'FAQ', contact:'Contact' },
   cta: { configure:'Start designing', quote:'Request a quote', quoteShort:'Quote', more:'Learn more',
          toCheckout:'To checkout', configureFull:'Configure in full', all:'All products' },
-  common: { from:'from', perOrder:'per order', minOrder:'Minimum order 1,000 units',
+  common: { from:'from', perOrder:'per order', minOrder:'from 250 units',
             search:'Search', menu:'Menu', design:'Design', currency:'Currency', language:'Language' },
   cookie: { title:'Privacy settings',
     body:'We use cookies to run the site and — with your consent — to measure reach and marketing.',

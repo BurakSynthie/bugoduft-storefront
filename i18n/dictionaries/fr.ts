@@ -3,7 +3,7 @@ const fr = {
          production:'Production', references:'Références', faq:'FAQ', contact:'Contact' },
   cta: { configure:'Créer maintenant', quote:'Demander un devis', quoteShort:'Devis', more:'En savoir plus',
          toCheckout:'Vers le paiement', configureFull:'Configurer entièrement', all:'Tous les produits' },
-  common: { from:'à partir de', perOrder:'par commande', minOrder:'Commande minimum 1 000 pièces',
+  common: { from:'à partir de', perOrder:'par commande', minOrder:'dès 250 pièces',
             search:'Rechercher', menu:'Menu', design:'Créer', currency:'Devise', language:'Langue' },
   cookie: { title:'Paramètres de confidentialité',
     body:'Nous utilisons des cookies pour faire fonctionner le site et — avec votre consentement — mesurer l’audience et le marketing.',

@@ -263,7 +263,11 @@ export default async function CatchAll({ params, searchParams }: { params: Promi
                         lets the quantity label shrink/wrap while `auto` keeps the price column at its
                         content width; the price stays nowrap + right-aligned so the € can never leave
                         the viewport (even "ab 100.000 Stück · 209,00 €" fits at 320px). */}
-                    {p.tiers.map(t => (
+                    {/* §INTRO-250-500 this table states the per-1.000 RATE at each step, a convention
+                        that only makes sense on the 1.000 ladder. The two intro entries (250/500)
+                        are shown — with their real order price — in the configurator, so they are
+                        excluded here to avoid a misleading "ab 250 Stück · 716,00 €" per-1.000 row. */}
+                    {p.tiers.filter(t => t.minQty >= 1000).map(t => (
                       <div key={t.minQty} style={{ display:'grid', gridTemplateColumns:'minmax(0,1fr) auto', gap:'var(--s-3)', alignItems:'baseline', fontSize:'.92rem' }}>
                         <span className="muted" style={{ minWidth:0 }}>{locale==='de'?'ab':locale==='en'?'from':'dès'} {new Intl.NumberFormat(locale==='de'?'de-DE':locale==='en'?'en-IE':'fr-FR').format(t.minQty)} {locale==='fr'?'pièces':'Stück'}</span>
                         <span className="price" style={{ whiteSpace:'nowrap', textAlign:'right' }}>{formatMoney(t.unitPriceCents, p.currency, locale)}</span>

@@ -27,7 +27,13 @@ export function priceQuantitySafe(tiers: PriceTier[], qty: number): QuotePrice |
   const sorted = [...tiers].sort((a, b) => a.minQty - b.minQty);
   const tier = pickTier(sorted, qty);
   if (!tier) return null;                                    // §P0/HIGH-12 no future-tier fallback
-  const base = sorted[0];                                    // cheapest-min tier = "list" reference
+  // §INTRO-250-500 "list" reference = the entry of the real 1.000 ladder, NOT an intro (sub-1.000)
+  // tier. Intro tiers (250/500) are deliberately unit-expensive entry points; letting one become
+  // the base would inflate the strike-through/savings on every 1.000+ order (and show a bogus
+  // "saving" on the intro order itself). Anchor the reference to the smallest-min tier at or above
+  // 1.000, falling back to the overall cheapest-min tier only when no such tier exists.
+  const ladder = sorted.filter(t => t.minQty >= 1000);
+  const base = (ladder.length ? ladder : sorted)[0];         // 1.000-ladder entry = "list" reference
   const blocks = qty / 1000;
   const totalCents = Math.round(tier.ratePer1000Cents * blocks);
   const baseTotalCents = Math.round(base.ratePer1000Cents * blocks);

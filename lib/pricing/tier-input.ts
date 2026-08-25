@@ -16,12 +16,24 @@ export type QtyRuleInput = { minQty: number; maxQty: number; qtyStep: number };
 
 // Turkish admin-facing messages (admin panel is Turkish-only).
 const ERR_DUP = 'Aynı adet kademesi birden fazla kez kullanılamaz.';
-const ERR_TIER_RANGE = 'Fiyat kademesi adedi 1.000 ile 100.000 arasında ve 1.000’in katı olmalıdır.';
+const ERR_TIER_RANGE = 'Fiyat kademesi adedi 250, 500 veya 1.000–100.000 arası (1.000’in katı) olmalıdır.';
 const ERR_TIER_NUM = 'Fiyat kademesi değerleri geçersiz.';
 const ERR_QTY_RULE = 'Adet kuralları 1.000 ile 100.000 arasında ve 1.000’in katı olmalıdır (min ≤ maks).';
 
+// §INTRO-250-500 — the two fixed intro entry points. Valid ONLY as a price-tier lower bound
+// (so a product can carry a 250- and a 500-unit price). They are DELIBERATELY absent from the
+// product qty-rule envelope (validateQtyRules) and from isBlockOf1000: a product's min/max/step
+// stay 1.000, so no intermediate quantity (750, 1.250 …) is ever opened.
+const INTRO_TIER_MIN_QTYS = new Set<number>([250, 500]);
+
 function isBlockOf1000(n: number): boolean {
   return Number.isInteger(n) && n >= QTY_ENVELOPE.min && n <= QTY_ENVELOPE.max && n % QTY_ENVELOPE.step === 0;
+}
+
+// A price tier's lower bound may be a 1.000-block OR one of the two intro entry points. This is
+// the ONLY place intro quantities are accepted; product qty rules (validateQtyRules) never are.
+function isValidTierMinQty(n: number): boolean {
+  return isBlockOf1000(n) || INTRO_TIER_MIN_QTYS.has(n);
 }
 
 // Validate per-product quantity rules against the canonical envelope.
@@ -49,7 +61,7 @@ export function validateTiers(input: TierInput[]): { ok: true; tiers: CleanTier[
     const minQty = Math.round(Number(t.minQty));
     const rate = Math.round(Number(t.ratePer1000Cents));
     if (!Number.isInteger(rate) || rate < 0) return { ok: false, error: ERR_TIER_NUM };
-    if (!isBlockOf1000(minQty)) return { ok: false, error: ERR_TIER_RANGE };
+    if (!isValidTierMinQty(minQty)) return { ok: false, error: ERR_TIER_RANGE };
     cleaned.push({
       minQty, ratePer1000Cents: rate,
       badgeDe: t.badgeDe ?? '', badgeEn: t.badgeEn ?? '', badgeFr: t.badgeFr ?? '',

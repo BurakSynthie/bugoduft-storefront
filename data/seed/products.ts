@@ -10,7 +10,8 @@ const options = [
 export const products: ProductSeed[] = [
   { id:'p-standard', productCode:'BUGO-STD', collectionCode:'STANDARD', groupId:'prod-standard',
     isActive:true, basePriceCents:26900, currency:'EUR', minQty:1000, maxQty:100000, qtyStep:1000,
-    tiers:[{minQty:1000,unitPriceCents:26900}],
+    // §INTRO-250-500 two intro entries (rate/1.000: 250 ⇒ ×0,25 = 179 €, 500 ⇒ ×0,5 = 199 €) + the 1.000 ladder entry.
+    tiers:[{minQty:250,unitPriceCents:71600},{minQty:500,unitPriceCents:39800},{minQty:1000,unitPriceCents:26900}],
     options:options, scentCodes:['frisch-ocean','frisch-cotton','fruchtig-apple','fruchtig-cherry','suess-vanilla','elegant-black','intensiv-espresso'],
     tr:{
       de:{ name:'Standard Duftanhänger', slug:'standard-duftanhaenger', h1:'Standard Duftanhänger individuell bedrucken',
@@ -27,7 +28,8 @@ export const products: ProductSeed[] = [
            seo:{ title:'Désodorisants Standard personnalisés avec logo | BUGO DUFT', description:'Désodorisants publicitaires standard imprimés avec votre logo. Dès 1 000 pièces, ~20 parfums, à partir de 269 €.' } } } },
   { id:'p-premium', productCode:'BUGO-PRM', collectionCode:'PREMIUM', groupId:'prod-premium',
     isActive:true, basePriceCents:27900, currency:'EUR', minQty:1000, maxQty:100000, qtyStep:1000,
-    tiers:[{minQty:1000,unitPriceCents:27900}],
+    // §INTRO-250-500 two intro entries (250 ⇒ 189 €, 500 ⇒ 209 €) + the 1.000 ladder entry.
+    tiers:[{minQty:250,unitPriceCents:75600},{minQty:500,unitPriceCents:41800},{minQty:1000,unitPriceCents:27900}],
     options:options, scentCodes:['frisch-ocean','fruchtig-mango','suess-caramel','elegant-oud','intensiv-espresso'],
     tr:{
       de:{ name:'Premium Duftanhänger', slug:'premium-duftanhaenger', h1:'Premium Duftanhänger mit intensiver Duftveredelung',
@@ -44,7 +46,8 @@ export const products: ProductSeed[] = [
            seo:{ title:'Désodorisants Premium imprimés | BUGO DUFT', description:'Désodorisants publicitaires premium au parfum intense. Dès 1 000 pièces, à partir de 279 €.' } } } },
   { id:'p-deluxe', productCode:'BUGO-DLX', collectionCode:'DELUXE', groupId:'prod-deluxe',
     isActive:true, basePriceCents:28900, currency:'EUR', minQty:1000, maxQty:100000, qtyStep:1000,
-    tiers:[{minQty:1000,unitPriceCents:28900}],
+    // §INTRO-250-500 two intro entries (250 ⇒ 199 €, 500 ⇒ 219 €) + the 1.000 ladder entry.
+    tiers:[{minQty:250,unitPriceCents:79600},{minQty:500,unitPriceCents:43800},{minQty:1000,unitPriceCents:28900}],
     options:options, scentCodes:['elegant-black','elegant-oud','suess-vanilla','frisch-cotton'],
     tr:{
       de:{ name:'Deluxe Duftanhänger', slug:'deluxe-duftanhaenger', h1:'Deluxe Duftanhänger für anspruchsvolle Marken',
@@ -61,7 +64,8 @@ export const products: ProductSeed[] = [
            seo:{ title:'Désodorisants Deluxe | BUGO DUFT', description:'Désodorisants publicitaires deluxe, finition haut de gamme. Dès 1 000 pièces, à partir de 289 €.' } } } },
   { id:'p-vip', productCode:'BUGO-VIP', collectionCode:'VIP', groupId:'prod-vip',
     isActive:true, basePriceCents:32000, currency:'EUR', minQty:1000, maxQty:100000, qtyStep:1000,
-    tiers:[{minQty:1000,unitPriceCents:32000}],
+    // §INTRO-250-500 two intro entries (250 ⇒ 209 €, 500 ⇒ 229 €) + the 1.000 ladder entry.
+    tiers:[{minQty:250,unitPriceCents:83600},{minQty:500,unitPriceCents:45800},{minQty:1000,unitPriceCents:32000}],
     options:options, scentCodes:['elegant-oud','elegant-black','intensiv-espresso','suess-caramel','fruchtig-mango','frisch-ocean'],
     tr:{
       de:{ name:'VIP Duftanhänger', slug:'vip-duftanhaenger', h1:'VIP Duftanhänger – Premiumsegment mit größter Duftauswahl',

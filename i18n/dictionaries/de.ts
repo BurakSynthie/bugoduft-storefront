@@ -3,7 +3,7 @@ const de = {
          production:'Produktion', references:'Referenzen', faq:'FAQ', contact:'Kontakt' },
   cta: { configure:'Jetzt gestalten', quote:'Angebot anfragen', quoteShort:'Angebot', more:'Mehr erfahren',
          toCheckout:'Zum Checkout', configureFull:'Vollständig konfigurieren', all:'Alle Produkte' },
-  common: { from:'ab', perOrder:'pro Bestellung', minOrder:'Mindestbestellmenge 1.000 Stück',
+  common: { from:'ab', perOrder:'pro Bestellung', minOrder:'ab 250 Stück',
             search:'Suchen', menu:'Menü', design:'Gestalten', currency:'Währung', language:'Sprache' },
   cookie: { title:'Datenschutzeinstellungen',
     body:'Wir verwenden Cookies, um die Website zu betreiben und – mit Ihrer Einwilligung – Reichweite und Marketing zu messen.',

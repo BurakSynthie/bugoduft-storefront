@@ -2,7 +2,7 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import type { Locale } from '@/i18n/config';
 import { listProducts } from '@/repositories/catalog';
-import { validateQuantity } from '@/lib/quantity';
+import { validateQuantity, isIntroQty } from '@/lib/quantity';
 import { INTENSE_SURCHARGE_CENTS } from '@/config/shopify';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
@@ -186,7 +186,11 @@ export async function validateAndPrice(c: IncomingConfig): Promise<Priced> {
   }
 
   // Validate against AUTHORITATIVE rules (DB qty rules, DB active scents).
-  if (validateQuantity(c.quantity, { min: src.minQty, max: src.maxQty, step: src.qtyStep })) return { ok:false, error:'invalid_quantity' };
+  // §INTRO-250-500 — 250/500 are valid ONLY when this product actually carries an intro price
+  // tier for them. Products without an intro tier keep rejecting 250/500 as invalid_quantity, and
+  // even when allowed, pricing still fails closed below if no active tier covers the quantity.
+  const allowIntro = src.tiers.some(t => isIntroQty(t.minQty));
+  if (validateQuantity(c.quantity, { min: src.minQty, max: src.maxQty, step: src.qtyStep, allowIntro })) return { ok:false, error:'invalid_quantity' };
   if (!c.scentCode || !src.scentCodes.includes(c.scentCode)) return { ok:false, error:'invalid_scent' };
   if (c.scentCode2) {
     if (!src.scentCodes.includes(c.scentCode2)) return { ok:false, error:'invalid_scent2' };

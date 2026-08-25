@@ -24,7 +24,10 @@ export type CfgCollection = { collectionCode:string; collectionName:string; prod
   intenseCents?:number; minQty?:number; maxQty?:number; qtyStep?:number };
 export type CfgScent = { code:string; category:string; name:string; description:string };
 
-const QUICK = [1000,2000,5000,10000,25000,50000,100000];
+// §INTRO-250-500 valid quantities, in display order. 250 & 500 are the two fixed intro entries
+// (shown only for products that price them); the rest is the 1.000 ladder. NO intermediate
+// quantity (750 / 1.250 / 1.500 …) ever appears — the filter below enforces this.
+const QUICK = [250,500,1000,2000,3000,5000,10000,25000,50000,100000];
 const CATS = ['frisch','fruchtig','suess','elegant','intensiv'] as const;
 
 // Localized shape labels for the cart summary (the configurator tiles keep their
@@ -256,10 +259,17 @@ export default function Configurator({ locale, collections, scents, intenseCents
   const cfgTiers: PriceTier[] = (col?.tiers && col.tiers.length) ? col.tiers : [{ minQty:1000, ratePer1000Cents: base }];
   // §HIGH-4 the intensive rate belongs to the SELECTED product (not products[0]); prop is the fallback.
   const colIntenseCents = col?.intenseCents ?? intenseCents;
+  // §INTRO-250-500 this product offers the 250/500 intro entries iff it carries a price tier for
+  // them (mirrors the server: validation and pricing both hinge on an actual intro tier).
+  const allowIntro = cfgTiers.some(t => t.minQty === 250 || t.minQty === 500);
   // §HIGH-6 the SELECTED product's quantity rules (fall back to the canonical envelope).
-  const qtyRules = { min: col?.minQty ?? 1000, max: col?.maxQty ?? 100000, step: col?.qtyStep ?? 1000 };
+  const qtyRules = { min: col?.minQty ?? 1000, max: col?.maxQty ?? 100000, step: col?.qtyStep ?? 1000, allowIntro };
   // §HIGH-11 quick buttons must match the product's real step-from-min rule (aligns to min, not 0).
-  const quickQtys = QUICK.filter(n => n >= qtyRules.min && n <= qtyRules.max && (n - qtyRules.min) % qtyRules.step === 0);
+  // §INTRO-250-500 the two intro quantities are always offered when allowed; they are exceptions to
+  // the min/step ladder and never imply any intermediate quantity (750 / 1.250 …).
+  const quickQtys = QUICK.filter(n =>
+    (allowIntro && (n === 250 || n === 500))
+    || (n >= qtyRules.min && n <= qtyRules.max && (n - qtyRules.min) % qtyRules.step === 0));
   // §P0/HIGH-12 never invent a price when no tier covers the quantity (server is authoritative).
   const qp = priceQuantitySafe(cfgTiers, quantity)
     ?? { ratePer1000Cents: base, totalCents: 0, baseTotalCents: 0, savingsCents: 0, badge: null };
@@ -493,7 +503,13 @@ export default function Configurator({ locale, collections, scents, intenseCents
               {qtyErr && <p className="cfg-error" role="alert">{quantityMessage(qtyErr,locale,qtyRules)}</p>}
               {!qtyErr && (
                 <div className="tierbox">
-                  <div className="tierbox__row"><span>{formatQty(quantity,locale)} {t.pieces}</span><b>{formatMoney(unitRateCents,'EUR',locale)} / 1.000</b></div>
+                  {/* §INTRO-250-500 the intro entries (250/500) are fixed entry prices, not a per-1.000
+                      volume rate — showing "716,00 € / 1.000" for 250 pieces would mislead. For intro
+                      quantities we label the row instead; the Total row below states the real price. */}
+                  <div className="tierbox__row"><span>{formatQty(quantity,locale)} {t.pieces}</span>
+                    {(quantity===250||quantity===500)
+                      ? <b>{locale==='de'?'Einführungspreis':locale==='en'?'Intro price':'Prix découverte'}</b>
+                      : <b>{formatMoney(unitRateCents,'EUR',locale)} / 1.000</b>}</div>
                   <div className="tierbox__row tierbox__total"><span>{locale==='de'?'Gesamt':locale==='en'?'Total':'Total'}</span><b>{formatMoney(total,'EUR',locale)}</b></div>
                   {savingsCents>0 && <div className="tierbox__save">{locale==='de'?'Sie sparen':locale==='en'?'You save':'Vous économisez'} {formatMoney(savingsCents,'EUR',locale)}</div>}
                   {freeSample && <div className="tierbox__sample">🎁 {locale==='de'?`40 Düfte Musterpaket kostenlos inklusive · Wert: ${sampleValueEur} €`:locale==='en'?`Free 40-fragrance sample set included · Value: €${sampleValueEur}`:`Coffret 40 parfums offert · Valeur : ${sampleValueEur} €`}</div>}

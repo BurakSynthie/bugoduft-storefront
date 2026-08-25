@@ -149,6 +149,60 @@ expect('19i validateQtyRules min5000/max99000/step2000 accepted',
 // legacy default rule still holds.
 expect('19j default min1000/step1000: 2000 valid', validateQuantity(2000, { min: 1000, max: 100000, step: 1000 }), null);
 
+// ---- §INTRO-250-500 — two fixed intro entry points (250 & 500) --------------------------------
+// The four variants' intro tiers, exactly as seeded in migration 0037 / data/seed/products.ts.
+// Each carries its intro rates PLUS the untouched 1.000 ladder entry, so we also assert the
+// 1.000 series is unchanged and no intermediate quantity is opened.
+const INTRO_R = { min: 1000, max: 100000, step: 1000, allowIntro: true };
+// --- validation: 250/500 accepted only with allowIntro; 750/1.250/1.500 always rejected -------
+expect('intro 250 valid (allowIntro)', validateQuantity(250, INTRO_R), null);
+expect('intro 500 valid (allowIntro)', validateQuantity(500, INTRO_R), null);
+expect('intro 250 REJECTED without allowIntro', validateQuantity(250, { min: 1000, max: 100000, step: 1000 }), 'below_min');
+expect('intro 500 REJECTED without allowIntro', validateQuantity(500, { min: 1000, max: 100000, step: 1000 }), 'below_min');
+expect('no intermediate 750 (even with allowIntro)', validateQuantity(750, INTRO_R), 'below_min');
+expect('no intermediate 1250 (even with allowIntro)', validateQuantity(1250, INTRO_R), 'bad_step');
+expect('no intermediate 1500 (even with allowIntro)', validateQuantity(1500, INTRO_R), 'bad_step');
+expect('1000 still valid with allowIntro', validateQuantity(1000, INTRO_R), null);
+expect('2000 still valid with allowIntro', validateQuantity(2000, INTRO_R), null);
+
+// --- price to the exact cent for all four variants (rate × qty/1000) --------------------------
+type IV = { std: number; prm: number; dlx: number; vip: number };
+const T = (rate250: IV, rate500: IV, rate1000: IV) => ({
+  STD: [{ minQty: 250, ratePer1000Cents: rate250.std }, { minQty: 500, ratePer1000Cents: rate500.std }, { minQty: 1000, ratePer1000Cents: rate1000.std }] as PriceTier[],
+  PRM: [{ minQty: 250, ratePer1000Cents: rate250.prm }, { minQty: 500, ratePer1000Cents: rate500.prm }, { minQty: 1000, ratePer1000Cents: rate1000.prm }] as PriceTier[],
+  DLX: [{ minQty: 250, ratePer1000Cents: rate250.dlx }, { minQty: 500, ratePer1000Cents: rate500.dlx }, { minQty: 1000, ratePer1000Cents: rate1000.dlx }] as PriceTier[],
+  VIP: [{ minQty: 250, ratePer1000Cents: rate250.vip }, { minQty: 500, ratePer1000Cents: rate500.vip }, { minQty: 1000, ratePer1000Cents: rate1000.vip }] as PriceTier[],
+});
+const V = T(
+  { std: 71600, prm: 75600, dlx: 79600, vip: 83600 },  // 250 rates
+  { std: 39800, prm: 41800, dlx: 43800, vip: 45800 },  // 500 rates
+  { std: 26900, prm: 27900, dlx: 28900, vip: 32000 },  // 1.000 rates (unchanged)
+);
+// 250 → 179 / 189 / 199 / 209 €
+expect('STD 250 = 179,00 €', priceQuantitySafe(V.STD, 250)?.totalCents, 17900);
+expect('PRM 250 = 189,00 €', priceQuantitySafe(V.PRM, 250)?.totalCents, 18900);
+expect('DLX 250 = 199,00 €', priceQuantitySafe(V.DLX, 250)?.totalCents, 19900);
+expect('VIP 250 = 209,00 €', priceQuantitySafe(V.VIP, 250)?.totalCents, 20900);
+// 500 → 199 / 209 / 219 / 229 €
+expect('STD 500 = 199,00 €', priceQuantitySafe(V.STD, 500)?.totalCents, 19900);
+expect('PRM 500 = 209,00 €', priceQuantitySafe(V.PRM, 500)?.totalCents, 20900);
+expect('DLX 500 = 219,00 €', priceQuantitySafe(V.DLX, 500)?.totalCents, 21900);
+expect('VIP 500 = 229,00 €', priceQuantitySafe(V.VIP, 500)?.totalCents, 22900);
+// intro totals are whole cents (no rounding drift): round(rate*0.25) and round(rate*0.5) are exact
+expect('STD 250 exact (no rounding remainder)', 71600 % 4, 0);
+expect('STD 500 exact (no rounding remainder)', 39800 % 2, 0);
+// 1.000 series is UNCHANGED even with intro tiers present
+expect('STD 1000 still 269,00 € with intro tiers', priceQuantitySafe(V.STD, 1000)?.totalCents, 26900);
+expect('STD 2000 still 538,00 € with intro tiers', priceQuantitySafe(V.STD, 2000)?.totalCents, 53800);
+// intro tiers must NOT become the "list" reference for a 1.000 order (no bogus strike-through)
+expect('STD 1000 baseTotal = 269,00 € (intro not base)', priceQuantitySafe(V.STD, 1000)?.baseTotalCents, 26900);
+expect('STD 1000 savings = 0 (intro not base)', priceQuantitySafe(V.STD, 1000)?.savingsCents, 0);
+// pickTier lands on the right intro tier (never a lower one for 500)
+expect('pickTier(250) → 250 tier', pickTier(V.STD, 250)?.minQty, 250);
+expect('pickTier(500) → 500 tier', pickTier(V.STD, 500)?.minQty, 500);
+// storefront "ab" price for a min-1.000 product is still the 1.000 rate, not an intro rate
+expect('from @min 1000 with intro tiers = 26900 (not intro)', priceFromForMinQty(V.STD, 1000, 99999), 26900);
+
 // ---------------------------------------------------------------------------------------------
 // eslint-disable-next-line no-console
 console.log(failures === 0 ? '\nALL PRICING TESTS PASSED' : `\n${failures} PRICING TEST(S) FAILED`);
