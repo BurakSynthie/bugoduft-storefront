@@ -6,7 +6,7 @@ import { products } from '@/data/seed/products';
 import { scents } from '@/data/seed/scents';
 import { industries } from '@/data/seed/industries';
 import type { ProductSeed, ScentSeed } from '@/data/types';
-import { priceFromForMinQty } from '@/lib/pricing/tiers';
+import { storefrontFromCents } from '@/lib/pricing/tiers';
 
 export type ProductView = {
   id: string; code: string; collectionCode: string; groupId: string;
@@ -21,11 +21,10 @@ export type ProductView = {
   compareAtCents: number | null; promoActive: boolean; promoBadge: string | null;
 };
 
-// §P0-1: starting ("ab") price is the rate applicable to the product's MINIMUM order
-// quantity — NOT the cheapest bulk tier. Bulk discounts only apply once that qty is chosen.
-// Uses the same centralized rule as the DB reader so the two can never drift.
+// Storefront starting ("ab") price is the lowest purchasable TOTAL across the supplied tiers.
+// Uses the same centralized display-only rule as the DB reader so the two can never drift.
 function priceFrom(p: ProductSeed) {
-  return priceFromForMinQty(p.tiers.map(t => ({ minQty: t.minQty, ratePer1000Cents: t.unitPriceCents })), p.minQty, p.basePriceCents);
+  return storefrontFromCents(p.tiers.map(t => ({ minQty: t.minQty, ratePer1000Cents: t.unitPriceCents })), p.minQty, p.basePriceCents);
 }
 
 export function toProductView(p: ProductSeed, locale: Locale): ProductView {

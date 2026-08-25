@@ -58,5 +58,15 @@ export function priceFromForMinQty(tiers: PriceTier[], productMinQty: number, fa
   return applicable ? applicable.ratePer1000Cents : fallbackCents;
 }
 
+// Storefront "ab/from" price = the lowest TOTAL a customer can actually pay: the active tier
+// with the smallest minQty, priced at that tier's own quantity. Callers are responsible for
+// passing only ACTIVE tiers when their data source has an active/inactive flag.
+export function storefrontFromCents(tiers: PriceTier[], _productMinQty: number, fallbackCents: number): number {
+  const active = tiers.filter(t => Number.isFinite(t.minQty) && t.minQty > 0);
+  if (!active.length) return fallbackCents;
+  const smallest = active.slice().sort((a, b) => a.minQty - b.minQty)[0];
+  return Math.round(smallest.ratePer1000Cents * smallest.minQty / 1000);
+}
+
 export const DEFAULT_SAMPLE_THRESHOLD = 5000;
 export const DEFAULT_SAMPLE_VALUE_EUR = 40;

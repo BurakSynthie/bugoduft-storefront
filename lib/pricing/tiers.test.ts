@@ -5,7 +5,7 @@
 // per-product minimums/rates, inactive-tier exclusion, the quantity envelope and the design-mode
 // domain. Expected values are INDEPENDENT literals (no result is computed from the function under
 // test), so a wrong implementation cannot make its own check pass.
-import { priceQuantity, priceQuantitySafe, pickTier, hasTierCoverage, priceFromForMinQty, type PriceTier } from './tiers';
+import { priceQuantity, priceQuantitySafe, pickTier, hasTierCoverage, priceFromForMinQty, storefrontFromCents, type PriceTier } from './tiers';
 import { validateQuantity } from '../quantity';
 import { isDesignMode, normalizeDesignMode } from '../configurator/design-mode';
 import { validateTiers, validateQtyRules, validateTierCoverage } from './tier-input';
@@ -202,6 +202,11 @@ expect('pickTier(250) → 250 tier', pickTier(V.STD, 250)?.minQty, 250);
 expect('pickTier(500) → 500 tier', pickTier(V.STD, 500)?.minQty, 500);
 // storefront "ab" price for a min-1.000 product is still the 1.000 rate, not an intro rate
 expect('from @min 1000 with intro tiers = 26900 (not intro)', priceFromForMinQty(V.STD, 1000, 99999), 26900);
+
+// Display-only storefront from-price = the smallest purchasable tier's TOTAL, not its per-1.000 rate.
+const STANDARD_WITH_INTRO: PriceTier[] = V.STD;
+expect('storefront from with intro tier = 17900 total', storefrontFromCents(STANDARD_WITH_INTRO, 1000, 99999), 17900);
+expect('storefront from without intro tier = 26900 total @1000', storefrontFromCents(STANDARD, 1000, 99999), 26900);
 
 // ---------------------------------------------------------------------------------------------
 // eslint-disable-next-line no-console

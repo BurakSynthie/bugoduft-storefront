@@ -5,7 +5,7 @@ import type { Locale } from '@/i18n/config';
 import { itemPath } from '@/lib/routing';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { supabaseEnv } from '@/lib/supabase/env';
-import { priceFromForMinQty } from '@/lib/pricing/tiers';
+import { storefrontFromCents } from '@/lib/pricing/tiers';
 import type { ProductView } from './catalog';
 
 function db() {
@@ -40,13 +40,13 @@ function readMedia(p: any, locale: Locale) {
     galleryAlt: galleryRows.map((x: any) => x.alt) as (string | null)[],
     video: mediaUrl(p.video?.storage_path), poster: mediaUrl(p.poster?.storage_path) };
 }
-// §P0-1 rate applicable to the product's MINIMUM order quantity (not the cheapest tier), and
-// §HIGH-5 only ACTIVE tiers may influence it — the same active-tier universe the server checkout
-// prices against (repositories/configurations.ts). Rule centralized in lib/pricing/tiers.
+// Storefront starting ("ab") price is the lowest purchasable TOTAL, and §HIGH-5 only ACTIVE
+// tiers may influence it. The active-tier filter is intentionally preserved before display pricing.
+// Rule centralized in lib/pricing/tiers.
 type DbTier = { min_qty: number; unit_price_cents: number; is_active?: boolean };
 const activeTiers = (tiers: DbTier[]): DbTier[] => (tiers ?? []).filter(t => t.is_active !== false);
 const priceFrom = (base: number, tiers: DbTier[], minQty: number) =>
-  priceFromForMinQty(activeTiers(tiers).map(t => ({ minQty: t.min_qty, ratePer1000Cents: t.unit_price_cents })), minQty, base);
+  storefrontFromCents(activeTiers(tiers).map(t => ({ minQty: t.min_qty, ratePer1000Cents: t.unit_price_cents })), minQty, base);
 
 export async function listProductsDb(locale: Locale): Promise<ProductView[]> {
   const { data, error } = await db()
